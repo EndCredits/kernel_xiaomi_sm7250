@@ -2260,4 +2260,10 @@ extern inline bool is_inherit_top_app(struct task_struct *p);
 extern inline void set_inherit_top_app(struct task_struct *p,
 					struct task_struct *from);
 extern inline void restore_inherit_top_app(struct task_struct *p);
+
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+int do_stune_boost(char *st_name, int boost);
+int reset_stune_boost(char *st_name);
+#endif /* CONFIG_DYNAMIC_STUNE_BOOST */
+
 #endif
