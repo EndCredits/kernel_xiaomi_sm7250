@@ -30,6 +30,7 @@
 #include <linux/freezer.h>
 #include <linux/compat.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 
 #include "posix-timers.h"
 
@@ -440,6 +441,7 @@ int alarm_cancel(struct alarm *alarm)
 		if (ret >= 0)
 			return ret;
 		cpu_relax();
+		ndelay(TIMER_LOCK_TIGHT_LOOP_DELAY_NS);
 	}
 }
 EXPORT_SYMBOL_GPL(alarm_cancel);
