@@ -7838,7 +7838,7 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 	int delta = 0;
 	int task_boost = per_task_boost(p);
 	int boosted = (schedtune_task_boost(p) > 0) || (task_boost > 0);
-	int start_cpu = get_start_cpu(p);
+	int start_cpu = get_start_cpu(p, sync_boost);
 
 	if (start_cpu < 0)
 		goto eas_not_ready;
