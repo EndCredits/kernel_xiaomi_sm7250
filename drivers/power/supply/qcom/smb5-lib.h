@@ -517,8 +517,8 @@ struct smb_charger {
 	struct mutex		smb_lock;
 	struct mutex		ps_change_lock;
 	struct mutex		irq_status_lock;
+	struct mutex		moisture_detection_enable;
 	struct mutex		dcin_aicl_lock;
-	spinlock_t		moisture_detection_enable;
 	spinlock_t		typec_pr_lock;
 	struct mutex		adc_lock;
 	struct mutex		dpdm_lock;
@@ -847,6 +847,10 @@ struct smb_charger {
 
 	bool		report_input_absent;
 	bool		vbat_critical_low_triggered;
+
+	/* lpd timer work */
+	struct workqueue_struct *wq;
+	struct work_struct	lpd_recheck_work;
 };
 
 enum quick_charge_type {
