@@ -1,4 +1,4 @@
-menu "RMNet Optimization extensions"
+menu "Qualcomm RmNet Optimization extensions"
 
 source "techpack/data/drivers/rmnet/Kconfig"
 
