@@ -171,11 +171,11 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	return 0;
 }
 
-static int symbol_in_range(struct sym_entry *s, struct addr_range *ranges,
-			   int entries)
+static int symbol_in_range(const struct sym_entry *s,
+			   const struct addr_range *ranges, int entries)
 {
 	size_t i;
-	struct addr_range *ar;
+	const struct addr_range *ar;
 
 	for (i = 0; i < entries; ++i) {
 		ar = &ranges[i];
@@ -187,14 +187,14 @@ static int symbol_in_range(struct sym_entry *s, struct addr_range *ranges,
 	return 0;
 }
 
-static int symbol_valid(struct sym_entry *s)
+static int symbol_valid(const struct sym_entry *s)
 {
 	/* Symbols which vary between passes.  Passes 1 and 2 must have
 	 * identical symbol lists.  The kallsyms_* symbols below are only added
 	 * after pass 1, they would be included in pass 2 when --all-symbols is
 	 * specified so exclude them to get a stable symbol list.
 	 */
-	static char *special_symbols[] = {
+	static const char * const special_symbols[] = {
 		"kallsyms_addresses",
 		"kallsyms_offsets",
 		"kallsyms_relative_base",
@@ -209,12 +209,12 @@ static int symbol_valid(struct sym_entry *s)
 		"_SDA2_BASE_",		/* ppc */
 		NULL };
 
-	static char *special_prefixes[] = {
+	static const char * const special_prefixes[] = {
 		"__crc_",		/* modversions */
 		"__efistub_",		/* arm64 EFI stub namespace */
 		NULL };
 
-	static char *special_suffixes[] = {
+	static const char * const special_suffixes[] = {
 		"_veneer",		/* arm */
 		"_from_arm",		/* arm */
 		"_from_thumb",		/* arm */
@@ -306,7 +306,7 @@ static void read_map(FILE *in)
 	}
 }
 
-static void output_label(char *label)
+static void output_label(const char *label)
 {
 	printf(".globl %s\n", label);
 	printf("\tALGN\n");
@@ -315,7 +315,7 @@ static void output_label(char *label)
 
 /* uncompress a compressed symbol. When this function is called, the best table
  * might still be compressed itself, so the function needs to be recursive */
-static int expand_symbol(unsigned char *data, int len, char *result)
+static int expand_symbol(const unsigned char *data, int len, char *result)
 {
 	int c, rlen, total=0;
 
@@ -340,7 +340,7 @@ static int expand_symbol(unsigned char *data, int len, char *result)
 	return total;
 }
 
-static int symbol_absolute(struct sym_entry *s)
+static int symbol_absolute(const struct sym_entry *s)
 {
 	return s->percpu_absolute;
 }
@@ -514,7 +514,7 @@ static void write_src(void)
 /* table lookup compression functions */
 
 /* count all the possible tokens in a symbol */
-static void learn_symbol(unsigned char *symbol, int len)
+static void learn_symbol(const unsigned char *symbol, int len)
 {
 	int i;
 
@@ -523,7 +523,7 @@ static void learn_symbol(unsigned char *symbol, int len)
 }
 
 /* decrease the count for all the possible tokens in a symbol */
-static void forget_symbol(unsigned char *symbol, int len)
+static void forget_symbol(const unsigned char *symbol, int len)
 {
 	int i;
 
@@ -541,7 +541,7 @@ static void build_initial_tok_table(void)
 }
 
 static unsigned char *find_token(unsigned char *str, int len,
-				 unsigned char *token)
+				 const unsigned char *token)
 {
 	int i;
 
@@ -554,7 +554,7 @@ static unsigned char *find_token(unsigned char *str, int len,
 
 /* replace a given token in all the valid symbols. Use the sampled symbols
  * to update the counts */
-static void compress_symbols(unsigned char *str, int idx)
+static void compress_symbols(const unsigned char *str, int idx)
 {
 	unsigned int i, len, size;
 	unsigned char *p1, *p2;
