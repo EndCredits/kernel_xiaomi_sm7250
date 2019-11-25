@@ -1611,6 +1611,7 @@
 		reg-names = "cc_base";
 		vdd_cx-supply = <&VDD_CX_LEVEL>;
 		vdd_cx_ao-supply = <&VDD_CX_LEVEL_AO>;
+		gdsc_cx-supply = <&gpu_cx_gdsc>;
 		clocks = <&rpmhcc RPMH_CXO_CLK>;
 		#clock-cells = <1>;
 		#reset-cells = <1>;
@@ -1658,6 +1659,7 @@
 		reg-names = "cc_base";
 		vdd_cx-supply = <&VDD_CX_LEVEL>;
 		vdd_mx-supply = <&VDD_MX_LEVEL>;
+		gdsc_cx-supply = <&gpu_cx_gdsc>;
 		clocks = <&rpmhcc RPMH_CXO_CLK>;
 		clock-names = "xo";
 		#clock-cells = <1>;
