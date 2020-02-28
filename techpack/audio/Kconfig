@@ -1,0 +1,93 @@
+config PINCTRL_LPI
+        tristate "PINCTRL_LPI"
+config AUDIO_EXT_CLK
+        tristate "AUDIO_EXT_CLK"
+config SND_SOC_WCD9XXX_V2
+        tristate "SND_SOC_WCD9XXX_V2"
+config SND_SOC_WCD_MBHC
+        tristate "SND_SOC_WCD_MBHC"
+config SND_SOC_WSA881X
+        tristate "SND_SOC_WSA881X"
+config SND_SOC_WSA883X
+	tristate "SND_SOC_WSA883X"
+config WCD9XXX_CODEC_CORE_V2
+        tristate "WCD9XXX_CODEC_CORE_V2"
+config MSM_CDC_PINCTRL
+        tristate "MSM_CDC_PINCTRL"
+config MSM_QDSP6V2_CODECS
+        tristate "MSM_QDSP6V2_CODECS"
+config MSM_ULTRASOUND
+        tristate "MSM_ULTRASOUND"
+config MSM_QDSP6_APRV2_RPMSG
+        tristate "MSM_QDSP6_APRV2_RPMSG"
+config MSM_ADSP_LOADER
+        tristate "MSM_ADSP_LOADER"
+config REGMAP_SWR
+        tristate "REGMAP_SWR"
+config MSM_QDSP6_SSR
+        tristate "MSM_QDSP6_SSR"
+config MSM_QDSP6_PDR
+        tristate "MSM_QDSP6_PDR"
+config MSM_QDSP6_NOTIFIER
+        tristate "MSM_QDSP6_NOTIFIER"
+config SND_SOC_MSM_HOSTLESS_PCM
+        tristate "SND_SOC_MSM_HOSTLESS_PCM"
+config SND_SOC_MSM_QDSP6V2_INTF
+        tristate "SND_SOC_MSM_QDSP6V2_INTF"
+config SOUNDWIRE
+        tristate "SOUNDWIRE"
+config SOUNDWIRE_MSTR_CTRL
+        tristate "SOUNDWIRE_MSTR_CTRL"
+config SND_SOC_QDSP6V2
+        tristate "SND_SOC_QDSP6V2"
+config SND_SOC_WCD_MBHC_ADC
+        tristate "SND_SOC_WCD_MBHC_ADC"
+config SND_SOC_MSM_HDMI_CODEC_RX
+        tristate "SND_SOC_MSM_HDMI_CODEC_RX"
+config QTI_PP
+        tristate "QTI_PP"
+config SND_HWDEP_ROUTING
+        tristate "SND_HWDEP_ROUTING"
+config SND_SOC_MSM_STUB
+        tristate "SND_SOC_MSM_STUB"
+config MSM_AVTIMER
+        tristate "MSM_AVTIMER"
+config SND_SOC_BOLERO
+        tristate "SND_SOC_BOLERO"
+config WSA_MACRO
+        tristate "WSA_MACRO"
+config VA_MACRO
+        tristate "VA_MACRO"
+config RX_MACRO
+        tristate "RX_MACRO"
+config TX_MACRO
+        tristate "TX_MACRO"
+config DIGITAL_CDC_RSC_MGR
+	tristate "DIGITAL_CDC_RSC_MGR"
+config SND_SOC_WCD_IRQ
+        tristate "SND_SOC_WCD_IRQ"
+config SND_SOC_WCD938X
+        tristate "SND_SOC_WCD938X"
+config SND_SOC_WCD938X_SLAVE
+        tristate "SND_SOC_WCD938X_SLAVE"
+config SND_SOC_WCD937X
+        tristate "SND_SOC_WCD937X"
+config SND_SOC_WCD937X_SLAVE
+        tristate "SND_SOC_WCD937X_SLAVE"
+config SND_SOC_LITO
+        tristate "SND_SOC_LITO"
+config SND_EVENT
+        tristate "SND_EVENT"
+config SND_SOC_CS35L41
+        tristate "SND_SOC_CS35L41"
+config SND_SOC_TFA9874
+	tristate "SND_SOC_TFA9874"
+config MSM_CSPL
+        tristate "MSM_CSPL"
+config MI2S_DISABLE
+	tristate "MI2S_DISABLE"
+config TDM_DISABLE
+	tristate "TDM_DISABLE"
+config AUXPCM_DISABLE
+	tristate "AUXPCM_DISABLE"
+
