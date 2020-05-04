@@ -35,7 +35,7 @@ struct sym_entry {
 	unsigned int seq;
 	unsigned int start_pos;
 	unsigned int percpu_absolute;
-	unsigned char sym[0];
+	unsigned char sym[];
 };
 
 struct addr_range {
