@@ -2520,13 +2520,9 @@ static int __zap_zero_pages(pmd_t *pmd, unsigned long start,
 	return 0;
 }
 
-static inline void zap_zero_pages(struct mm_struct *mm)
-{
-	struct mm_walk walk = { .pmd_entry = __zap_zero_pages };
-
-	walk.mm = mm;
-	walk_page_range(0, TASK_SIZE, &walk);
-}
+static const struct mm_walk_ops zap_zero_walk_ops = {
+	.pmd_entry	= __zap_zero_pages,
+};
 
 /*
  * switch on pgstes for its userspace process (for kvm)
@@ -2545,7 +2541,7 @@ int s390_enable_sie(void)
 	mm->context.has_pgste = 1;
 	/* split thp mappings and disable thp for future mappings */
 	thp_split_mm(mm);
-	zap_zero_pages(mm);
+	walk_page_range(mm, 0, TASK_SIZE, &zap_zero_walk_ops, NULL);
 	up_write(&mm->mmap_sem);
 	return 0;
 }
@@ -2563,6 +2559,10 @@ static int __s390_enable_skey_pte(pte_t *pte, unsigned long addr,
 	return 0;
 }
 
+static const struct mm_walk_ops enable_skey_walk_ops = {
+	.hugetlb_entry		= __s390_enable_skey_hugetlb,
+	.pte_entry		= __s390_enable_skey_pte,
+};
 static int __s390_enable_skey_hugetlb(pte_t *pte, unsigned long addr,
 				      unsigned long hmask, unsigned long next,
 				      struct mm_walk *walk)
@@ -2590,10 +2590,6 @@ static int __s390_enable_skey_hugetlb(pte_t *pte, unsigned long addr,
 
 int s390_enable_skey(void)
 {
-	struct mm_walk walk = {
-		.hugetlb_entry = __s390_enable_skey_hugetlb,
-		.pte_entry = __s390_enable_skey_pte,
-	};
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	int rc = 0;
@@ -2613,8 +2609,7 @@ int s390_enable_skey(void)
 	}
 	mm->def_flags &= ~VM_MERGEABLE;
 
-	walk.mm = mm;
-	walk_page_range(0, TASK_SIZE, &walk);
+	walk_page_range(mm, 0, TASK_SIZE, &enable_skey_walk_ops, NULL);
 
 out_up:
 	up_write(&mm->mmap_sem);
@@ -2632,13 +2627,14 @@ static int __s390_reset_cmma(pte_t *pte, unsigned long addr,
 	return 0;
 }
 
+static const struct mm_walk_ops reset_cmma_walk_ops = {
+	.pte_entry		= __s390_reset_cmma,
+};
+
 void s390_reset_cmma(struct mm_struct *mm)
 {
-	struct mm_walk walk = { .pte_entry = __s390_reset_cmma };
-
 	down_write(&mm->mmap_sem);
-	walk.mm = mm;
-	walk_page_range(0, TASK_SIZE, &walk);
+	walk_page_range(mm, 0, TASK_SIZE, &reset_cmma_walk_ops, NULL);
 	up_write(&mm->mmap_sem);
 }
 EXPORT_SYMBOL_GPL(s390_reset_cmma);
