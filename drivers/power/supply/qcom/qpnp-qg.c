@@ -1216,9 +1216,17 @@ static void process_udata_work(struct work_struct *work)
 	int rc, batt_temp = 0;
 	bool usb_present = 0;
 	static int last_batt_temp = 250;
+	bool input_present = is_input_present(chip);
 
-	if (chip->udata.param[QG_CC_SOC].valid)
-		chip->cc_soc = chip->udata.param[QG_CC_SOC].data;
+	if (chip->udata.param[QG_CC_SOC].valid) {
+		if (!input_present &&
+		    chip->cc_soc < chip->udata.param[QG_CC_SOC].data)
+			pr_info("cc_soc %d is not monotonic. old cc_soc: %d\n",
+				chip->udata.param[QG_CC_SOC].data,
+				chip->cc_soc);
+		else
+			chip->cc_soc = chip->udata.param[QG_CC_SOC].data;
+	}
 
 	if (chip->udata.param[QG_BATT_SOC].valid)
 		chip->batt_soc = chip->udata.param[QG_BATT_SOC].data;
