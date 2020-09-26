@@ -329,33 +329,33 @@ static int __dcc_ll_cfg(struct dcc_drvdata *drvdata, int curr_list)
 				 */
 				ret = dcc_sram_writel(drvdata,
 							link, sram_offset);
-				if (ret)
-					goto overstep;
-				sram_offset += 4;
-				/* Reset link and prev_off */
-				addr = 0x00;
-				link = 0;
-				prev_off = 0;
-				prev_addr = addr;
+			if (ret)
+				goto overstep;
+			sram_offset += 4;
+			/* Reset link and prev_off */
+			addr = 0x00;
+			link = 0;
+			prev_off = 0;
+			prev_addr = addr;
 			}
 
 			addr = DCC_RD_MOD_WR_DESCRIPTOR;
 			ret = dcc_sram_writel(drvdata, addr, sram_offset);
 			if (ret)
 				goto overstep;
-				sram_offset += 4;
+			sram_offset += 4;
 
 			ret = dcc_sram_writel(drvdata,
 					entry->mask, sram_offset);
 			if (ret)
 				goto overstep;
-				sram_offset += 4;
+			sram_offset += 4;
 
 			ret = dcc_sram_writel(drvdata,
 					entry->write_val, sram_offset);
 			if (ret)
 				goto overstep;
-				sram_offset += 4;
+			sram_offset += 4;
 			addr = 0;
 			break;
 		}
@@ -366,9 +366,9 @@ static int __dcc_ll_cfg(struct dcc_drvdata *drvdata, int curr_list)
 			if (link) {
 				ret = dcc_sram_writel(drvdata,
 						link, sram_offset);
-				if (ret)
-					goto overstep;
-				sram_offset += 4;
+			if (ret)
+				goto overstep;
+			sram_offset += 4;
 			}
 
 			if (loop_start) {
@@ -438,18 +438,18 @@ static int __dcc_ll_cfg(struct dcc_drvdata *drvdata, int curr_list)
 			ret = dcc_sram_writel(drvdata, addr, sram_offset);
 			if (ret)
 				goto overstep;
-				sram_offset += 4;
+			sram_offset += 4;
 
 			ret = dcc_sram_writel(drvdata, link, sram_offset);
 			if (ret)
 				goto overstep;
-				sram_offset += 4;
+			sram_offset += 4;
 
 			ret = dcc_sram_writel(drvdata,
 				entry->write_val, sram_offset);
 			if (ret)
 				goto overstep;
-				sram_offset += 4;
+			sram_offset += 4;
 			addr = 0x00;
 			link = 0;
 			break;
