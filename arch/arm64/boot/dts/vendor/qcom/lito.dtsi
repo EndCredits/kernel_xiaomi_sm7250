@@ -523,7 +523,7 @@
 	};
 
 	chosen {
-		bootargs = "quite nodebugmon rcu_nocbs=0-7 earlycon=msm_geni_serial,0x888000 kpti=off" noirqdebug printk.devkmsg=on;
+		bootargs = "quite nodebugmon rcu_nocbs=0-7 earlycon=msm_geni_serial,0x888000 kpti=off" noirqdebug printk.devkmsg=on rcupdate.rcu_normal_after_boot=1;
 	};
 
 	soc: soc { };
