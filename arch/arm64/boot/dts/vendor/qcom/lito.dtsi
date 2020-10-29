@@ -517,7 +517,7 @@
 	};
 
 	chosen {
-		bootargs = "nodebugmon quiet rcu_nocbs=0-7 noirqdebug printk.devkmsg=on";
+		bootargs = "nodebugmon quiet rcu_nocbs=0-7 noirqdebug printk.devkmsg=on rcupdate.rcu_normal_after_boot=1";
 	};
 
 	soc: soc { };
