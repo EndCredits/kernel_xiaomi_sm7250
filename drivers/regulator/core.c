@@ -4733,7 +4733,6 @@ regulator_register(const struct regulator_desc *regulator_desc,
 {
 	const struct regulator_init_data *init_data;
 	struct regulator_config *config = NULL;
-	static atomic_t regulator_no = ATOMIC_INIT(-1);
 	struct regulator_dev *rdev;
 	struct device *dev;
 	int ret, i;
@@ -4826,8 +4825,7 @@ regulator_register(const struct regulator_desc *regulator_desc,
 	/* register with sysfs */
 	rdev->dev.class = &regulator_class;
 	rdev->dev.parent = dev;
-	dev_set_name(&rdev->dev, "regulator.%lu",
-		    (unsigned long) atomic_inc_return(&regulator_no));
+	dev_set_name(&rdev->dev, "regulator:%s", regulator_desc->name);
 
 	/* set regulator constraints */
 	if (init_data)
