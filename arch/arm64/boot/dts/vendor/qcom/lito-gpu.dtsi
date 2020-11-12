@@ -85,7 +85,6 @@
 		qcom,min-access-length = <32>;
 
 		qcom,ubwc-mode = <3>;
-		qcom,no-nap;
 		qcom,snapshot-size = <2048576>; /* bytes */
 		qcom,gpu-qdss-stm = <0x161c0000 0x40000>; /* base addr, size */
 
