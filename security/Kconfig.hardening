@@ -91,6 +91,18 @@ choice
 
 endchoice
 
+config CC_HAS_AUTO_VAR_INIT_ZERO
+	def_bool $(cc-option,-ftrivial-auto-var-init=zero -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang)
+
+config INIT_STACK_NONE
+	bool "no automatic initialization (weakest)"
+	default y
+	help
+	  Disable automatic stack variable initialization.
+	  This leaves the kernel vulnerable to the standard
+	  classes of uninitialized stack variable exploits
+	  and information exposures.
+
 config GCC_PLUGIN_STRUCTLEAK_VERBOSE
 	bool "Report forcefully initialized variables"
 	depends on GCC_PLUGIN_STRUCTLEAK
