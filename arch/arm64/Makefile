@@ -51,6 +51,9 @@ endif
 
 ifeq ($(cc-name),clang)
 KBUILD_CFLAGS	+= -mno-implicit-float
+ifeq ($(CONFIG_ARCH_LITO), y)
+KBUILD_CFLAGS	+= -mcpu=cortex-a55 -mtune=cortex-a55
+endif
 else
 KBUILD_CFLAGS	+= -mgeneral-regs-only
 endif
