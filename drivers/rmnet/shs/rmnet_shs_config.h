@@ -1,4 +1,5 @@
 /* Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,6 +48,8 @@ enum rmnet_shs_crit_err_e {
 	RMNET_SHS_WQ_NODE_MALLOC_ERR,
 	RMNET_SHS_WQ_NL_SOCKET_ERR,
 	RMNET_SHS_CPU_FLOWS_BNDS_ERR,
+	RMNET_SHS_OUT_OF_MEM_ERR,
+	RMNET_SHS_UDP_SEGMENT,
 	RMNET_SHS_CRIT_ERR_MAX
 };
 

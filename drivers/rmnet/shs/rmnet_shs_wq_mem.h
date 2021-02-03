@@ -1,4 +1,5 @@
 /* Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -107,7 +108,7 @@ void rmnet_shs_wq_mem_update_cached_sorted_gold_flows(struct list_head *gold_flo
 void rmnet_shs_wq_mem_update_cached_sorted_ss_flows(struct list_head *ss_flows);
 void rmnet_shs_wq_mem_update_cached_netdevs(void);
 
-void rmnet_shs_wq_mem_init(void);
+int rmnet_shs_wq_mem_init(void);
 
 void rmnet_shs_wq_mem_deinit(void);
 

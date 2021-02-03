@@ -1,4 +1,5 @@
 /* Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -296,6 +297,7 @@ void rmnet_shs_wq_hstat_reset_node(struct rmnet_shs_wq_hstat_s *hnode)
 	hnode->hash = 0;
 	hnode->suggested_cpu = 0;
 	hnode->current_cpu = 0;
+	hnode->segs_per_skb = 0;
 	hnode->skb_tport_proto = 0;
 	hnode->stat_idx = -1;
 	INIT_LIST_HEAD(&hnode->cpu_node_id);
@@ -409,7 +411,8 @@ void rmnet_shs_wq_create_new_flow(struct rmnet_shs_skbn_s *node_p)
 		node_p->hstats->skb_tport_proto = node_p->skb_tport_proto;
 		node_p->hstats->current_cpu = node_p->map_cpu;
 		node_p->hstats->suggested_cpu = node_p->map_cpu;
-
+		/* Set egmentation off  by default */
+		node_p->hstats->segs_per_skb = 0;
 		/* Start TCP flows with segmentation if userspace connected */
 		if (rmnet_shs_userspace_connected &&
 		    node_p->hstats->skb_tport_proto == IPPROTO_TCP)
@@ -1939,7 +1942,7 @@ void rmnet_shs_update_cfg_mask(void)
 	}
 }
 
-void rmnet_shs_wq_filter(void)
+noinline void rmnet_shs_wq_filter(void)
 {
 	int cpu, cur_cpu;
 	int temp;
@@ -1964,11 +1967,11 @@ void rmnet_shs_wq_filter(void)
 				rmnet_shs_cpu_rx_filter_flows[temp]++;
 			}
 		cur_cpu = hnode->current_cpu;
-		if (cur_cpu >= MAX_CPUS) {
+		if (cur_cpu >= MAX_CPUS || cur_cpu < 0) {
 			continue;
 		}
 
-		if (hnode->node->hstats->segs_per_skb > 0) {
+		if (hnode->segs_per_skb > 0) {
 			rmnet_shs_cpu_node_tbl[cur_cpu].seg++;
 		}
 	}
@@ -2149,12 +2152,12 @@ void rmnet_shs_wq_init(struct net_device *dev)
 		return;
 	}
 
-	rmnet_shs_wq_mem_init();
+	if( rmnet_shs_wq_mem_init() )
+		rmnet_shs_wq_genl_deinit();
 
 	trace_rmnet_shs_wq_high(RMNET_SHS_WQ_INIT, RMNET_SHS_WQ_INIT_START,
 				0xDEF, 0xDEF, 0xDEF, 0xDEF, NULL, NULL);
-	rmnet_shs_wq = alloc_workqueue("rmnet_shs_wq",
-					WQ_MEM_RECLAIM | WQ_CPU_INTENSIVE, 1);
+	rmnet_shs_wq = alloc_workqueue("rmnet_shs_wq", WQ_CPU_INTENSIVE, 1);
 	if (!rmnet_shs_wq) {
 		rmnet_shs_crit_err[RMNET_SHS_WQ_ALLOC_WQ_ERR]++;
 		return;
