@@ -393,6 +393,8 @@ struct usbpd {
 	struct work_struct	start_periph_work;
 	struct delayed_work	src_check_work;
 	struct work_struct	restart_host_work;
+	struct delayed_work	src_check_work;
+
 	struct hrtimer		timer;
 	bool			sm_queued;
 
@@ -518,6 +520,9 @@ struct usbpd {
 	/* uv wa */
 	int			uv_wa;
 	bool			typec_analog_audio_connected;
+
+	/* uv wa */
+	int			uv_wa;
 };
 
 static LIST_HEAD(_usbpd);	/* useful for debugging */
@@ -5507,6 +5512,8 @@ struct usbpd *usbpd_create(struct device *parent)
 	INIT_WORK(&pd->sm_work, usbpd_sm);
 	INIT_WORK(&pd->start_periph_work, start_usb_peripheral_work);
 	INIT_WORK(&pd->restart_host_work, restart_usb_host_work);
+	INIT_DELAYED_WORK(&pd->src_check_work, source_check_workfunc);
+
 	hrtimer_init(&pd->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	pd->timer.function = pd_timeout;
 	mutex_init(&pd->swap_lock);
@@ -5585,6 +5592,28 @@ struct usbpd *usbpd_create(struct device *parent)
 					"qcom,vconn-uses-external-source");
 	if (device_property_read_bool(parent, "qcom,no-usb3-dp-concurrency"))
 		pd->no_usb3dp_concurrency = true;
+
+	ret = of_property_read_u32(parent->of_node, "mi,limit_pd_vbus",
+			&pd->limit_pd_vbus);
+	if (ret) {
+		usbpd_err(&pd->dev, "failed to read pd vbus limit\n");
+		pd->limit_pd_vbus = false;
+	}
+
+	if (pd->limit_pd_vbus) {
+		ret = of_property_read_u32(parent->of_node, "mi,pd_vbus_max_limit",
+				&pd->pd_vbus_max_limit);
+		if (ret) {
+			usbpd_err(&pd->dev, "failed to read pd vbus max limit\n");
+			pd->pd_vbus_max_limit = PD_VBUS_MAX_VOLTAGE_LIMIT;
+		}
+	}
+
+	pd->non_qcom_pps_ctr = of_property_read_bool(parent->of_node,
+				"mi,non-qcom-pps-ctrl");
+
+	pd->vconn_is_external = device_property_present(parent,
+					"qcom,vconn-uses-external-source");
 
 	pd->num_sink_caps = device_property_read_u32_array(parent,
 			"qcom,default-sink-caps", NULL, 0);
