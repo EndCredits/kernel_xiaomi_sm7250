@@ -11,6 +11,8 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
+source "drivers/input/touchscreen/xiaomi/Kconfig"
+
 config SECURE_TOUCH
 	bool "Secure Touch"
 	default y
