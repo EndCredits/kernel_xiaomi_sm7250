@@ -1081,19 +1081,6 @@ static int smb1398_div2_cp_get_min_icl(struct smb1398_chip *chip)
 	return chip->div2_cp_min_ilim_ua;
 }
 
-static char *div2_cp_get_model_name(struct smb1398_chip *chip)
-{
-	if (IS_SMB1394(chip->div2_cp_role))
-		return "SMB1394";
-
-	if (chip->pmic_rev_id->rev4 > 2)
-		return "SMB1398_V3";
-	else if (chip->pmic_rev_id->rev4 == 2)
-		return "SMB1398_V2";
-	else
-		return "SMB1398_V1";
-}
-
 static int div2_cp_master_get_prop(struct power_supply *psy,
 				enum power_supply_property prop,
 				union power_supply_propval *val)
@@ -1182,9 +1169,6 @@ static int div2_cp_master_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CHIP_VERSION:
 		val->intval = DIV2_CP_HW_VERSION_3;
-		break;
-	case POWER_SUPPLY_PROP_MODEL_NAME:
-		val->strval = div2_cp_get_model_name(chip);
 		break;
 	case POWER_SUPPLY_PROP_PARALLEL_MODE:
 		/* USBIN only */

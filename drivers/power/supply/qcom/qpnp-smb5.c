@@ -473,6 +473,10 @@ static int smb5_parse_dt_misc(struct smb5 *chip, struct device_node *node)
 
 	chg->sw_jeita_enabled = of_property_read_bool(node,
 				"qcom,sw-jeita-enable");
+
+	chg->jeita_arb_enable = of_property_read_bool(node,
+				"qcom,jeita-arb-enable");
+
 #ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	chg->use_bq_pump = of_property_read_bool(node,
 				"mi,use-bq-pump");
