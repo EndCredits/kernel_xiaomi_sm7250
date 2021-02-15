@@ -67,7 +67,7 @@ static int device_open(struct inode *inode, struct file *filp)
 
 	if (down_interruptible(&io_device.sem) != 0)
 		return -EEXIST;
-	EL_PRINT_I("Opened device %s", USERSPACE_IO_DEVICE_NAME);
+	EL_PRINT_D("Opened device %s", USERSPACE_IO_DEVICE_NAME);
 	return 0;
 }
 
@@ -85,7 +85,7 @@ static ssize_t device_write(struct file *fp, const char __user *buff,
 static int device_close(struct inode *inode, struct file *filp)
 {
 	up(&io_device.sem);
-	EL_PRINT_I("Closed device %s", USERSPACE_IO_DEVICE_NAME);
+	EL_PRINT_D("Closed device %s", USERSPACE_IO_DEVICE_NAME);
 	return 0;
 }
 
