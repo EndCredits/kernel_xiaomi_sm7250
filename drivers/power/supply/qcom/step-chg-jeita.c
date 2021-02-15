@@ -837,7 +837,7 @@ static int handle_jeita(struct step_chg_info *chip)
 			pr_err("%s:failed to read usb_is_removing", __func__);
 			return 0;
 		}
-		pr_info("%s:usb_is_removing=%d\n", __func__,pval.intval);
+		pr_debug("%s:usb_is_removing=%d\n", __func__,pval.intval);
 		if (!pval.intval)
 			return 0;
 	}
