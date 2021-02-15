@@ -351,7 +351,7 @@ static void msm_dai_q6_hdmi_shutdown(struct snd_pcm_substream *substream,
 	int rc = 0;
 
 	if (!test_bit(STATUS_PORT_STARTED, dai_data->status_mask)) {
-		pr_info("%s:  afe port not started. dai_data->status_mask = %ld\n",
+		pr_debug("%s:  afe port not started. dai_data->status_mask = %ld\n",
 		 __func__, *dai_data->status_mask);
 		return;
 	}

@@ -55,11 +55,11 @@
 
 #undef CONFIG_OF
 
-#undef pr_info
+#undef pr_debug
 #undef pr_err
 #undef pr_debug
 #define pr_debug(fmt, args...) printk(KERN_INFO "[CSPL] " pr_fmt(fmt), ##args)
-#define pr_info(fmt, args...) printk(KERN_INFO "[CSPL] " pr_fmt(fmt), ##args)
+#define pr_debug(fmt, args...) printk(KERN_INFO "[CSPL] " pr_fmt(fmt), ##args)
 #define pr_err(fmt, args...) printk(KERN_ERR "[CSPL] " pr_fmt(fmt), ##args)
 
 #define CRUS_TX_CONFIG "crus_sp_tx%d.bin"
@@ -192,7 +192,7 @@ static int crus_afe_get_param_v2(int port, int module, int param,
 	int index = afe_get_port_index(port);
 	int ret = 0, count = 0;
 
-	pr_info("CRUS_SP: (get_param) module = 0x%08x, port = 0x%08x, param = 0x%08x\n",
+	pr_debug("CRUS_SP: (get_param) module = 0x%08x, port = 0x%08x, param = 0x%08x\n",
 		module, port, param);
 
 	config = (struct afe_custom_crus_get_config_v2_t *)
@@ -240,7 +240,7 @@ static int crus_afe_set_param_v2(int port, int module, int param,
 	int index = afe_get_port_index(port);
 	int ret = 0;
 
-	pr_info("CRUS_SP: (set_param) module = 0x%08x, port = 0x%08x, param = 0x%08x\n",
+	pr_debug("CRUS_SP: (set_param) module = 0x%08x, port = 0x%08x, param = 0x%08x\n",
 		module, port, param);
 
 	config = crus_gen_afe_set_header(length, port, module, param);
@@ -271,7 +271,7 @@ static int crus_afe_get_param_v3(int port, int module_id,
 	int index = 0;
 	int ret = 0;
 
-	pr_info("%s: port=0x%x, module=0x%x, param_id=0x%x, size=%d\n",
+	pr_debug("%s: port=0x%x, module=0x%x, param_id=0x%x, size=%d\n",
 				__func__, port, module_id, param_id, length);
 
 	param_hdr.module_id = module_id;
@@ -322,17 +322,17 @@ static int crus_afe_get_param_v3(int port, int module_id,
 
 #if 0 
 	for (index = 0; index < length; index ++)
-		pr_info("[%d]=%d\n", index, this_ctrl.user_buffer[index]);
+		pr_debug("[%d]=%d\n", index, this_ctrl.user_buffer[index]);
 
-	pr_info("[5]=%s\n", &this_ctrl.user_buffer[5]);
+	pr_debug("[5]=%s\n", &this_ctrl.user_buffer[5]);
 #endif
 	/* copy from dynamic buffer to return buffer */
 	memcpy((u8*)data, &this_ctrl.user_buffer[5], length);
-	pr_info("%s: Copied %d bytes data \n", __func__, length);
+	pr_debug("%s: Copied %d bytes data \n", __func__, length);
 
 	ret = 0;
 fail_cmd:
-	pr_info("%s: param_id %x status %d\n", __func__, param_id, ret);
+	pr_debug("%s: param_id %x status %d\n", __func__, param_id, ret);
 	mutex_unlock(&this_ctrl.param_lock);
 	kfree(this_ctrl.user_buffer);
 	return ret;
@@ -350,7 +350,7 @@ static int crus_afe_set_param_v3(int port, int module_id,
 	int packed_data_size = sizeof(union param_hdrs) + length;
 	int ret = 0;
 
-	pr_info("%s: port=0x%x, module=0x%x, param_id=0x%x, size=%d\n",
+	pr_debug("%s: port=0x%x, module=0x%x, param_id=0x%x, size=%d\n",
 				__func__, port, module_id, param_id, length);
 
 	port_id = q6audio_get_port_id(port);
@@ -429,7 +429,7 @@ static int crus_afe_set_param_v3(int port, int module_id,
 
 	ret = 0;
 fail_cmd:
-	pr_info("[CSPL]%s param_id %x status %d\n", __func__, param_id, ret);
+	pr_debug("[CSPL]%s param_id %x status %d\n", __func__, param_id, ret);
 	kfree(set_param);
 	kfree(packed_param_data);
 	return ret;
@@ -506,7 +506,7 @@ static int crus_afe_send_config(const char *data, int32_t length,
 	int index = afe_get_port_index(port);
 	uint32_t param = 0;
 
-	pr_info("CRUS_SP: (send_config) module = 0x%08x, port = 0x%08x\n",
+	pr_debug("CRUS_SP: (send_config) module = 0x%08x, port = 0x%08x\n",
 		module, port);
 
 	/* Destination settings for message */
@@ -579,7 +579,7 @@ static int crus_afe_send_delta(const char *data, uint32_t length)
 	int chars_to_send, mem_size, sent = 0, ret = 0;
 	int index = afe_get_port_index(port);
 
-	pr_info("CRUS_SP: (send_delta) module = 0x%08x, port = 0x%08x\n",
+	pr_debug("CRUS_SP: (send_delta) module = 0x%08x, port = 0x%08x\n",
 		module, port);
 
 	if (length > APR_CHUNK_SIZE)
@@ -655,7 +655,7 @@ int msm_routing_cirrus_fbport_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	this_ctrl.fb_port_index = ucontrol->value.integer.value[0];
-	pr_info("%s: %d\n", __func__, this_ctrl.fb_port);
+	pr_debug("%s: %d\n", __func__, this_ctrl.fb_port);
 
 	switch (this_ctrl.fb_port_index) {
 		case 0:
@@ -705,7 +705,7 @@ static int msm_routing_crus_sp_enable_put(struct snd_kcontrol *kcontrol,
 static int msm_routing_crus_sp_enable_get(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
-	pr_info("%s: %d\n", __func__, this_ctrl.enable);
+	pr_debug("%s: %d\n", __func__, this_ctrl.enable);
 	ucontrol->value.integer.value[0] = this_ctrl.enable;
 
 	return 0;
@@ -774,7 +774,7 @@ static int msm_routing_crus_sp_usecase_put(struct snd_kcontrol *kcontrol,
 static int msm_routing_crus_sp_usecase_get(struct snd_kcontrol *kcontrol,
 					   struct snd_ctl_elem_value *ucontrol)
 {
-	pr_info("%s: %d\n", __func__, this_ctrl.usecase);
+	pr_debug("%s: %d\n", __func__, this_ctrl.usecase);
 	ucontrol->value.integer.value[0] = this_ctrl.usecase;
 
     return 0;
@@ -803,7 +803,7 @@ static int msm_routing_crus_load_config_put(struct snd_kcontrol *kcontrol,
 			return -EINVAL;
 		}
 
-		pr_info("CRUS_SP: Sending RX config...\n");
+		pr_debug("CRUS_SP: Sending RX config...\n");
 
 		crus_afe_send_config(firmware->data, firmware->size,
 				     this_ctrl.ff_port, CIRRUS_SP);
@@ -821,7 +821,7 @@ static int msm_routing_crus_load_config_put(struct snd_kcontrol *kcontrol,
 			return -EINVAL;
 		}
 
-		pr_info("CRUS_SP: Sending TX config...\n");
+		pr_debug("CRUS_SP: Sending TX config...\n");
 
 		crus_afe_send_config(firmware->data, firmware->size,
 				     this_ctrl.fb_port, CIRRUS_SP);
@@ -865,7 +865,7 @@ static int msm_routing_crus_delta_config_put(struct snd_kcontrol *kcontrol,
 			return -EINVAL;
 		}
 
-		pr_info("CRUS_SP: Sending delta config...\n");
+		pr_debug("CRUS_SP: Sending delta config...\n");
 
 		crus_afe_send_delta(firmware->data, firmware->size);
 		release_firmware(firmware);
@@ -997,7 +997,7 @@ static int msm_routing_crus_chan_swap_dur_put(struct snd_kcontrol *kcontrol,
 	}
 
 	if (crus_set < MIN_CHAN_SWAP_SAMPLES) {
-		pr_info("CRUS_SP: Received %d, round up to min value %d\n",
+		pr_debug("CRUS_SP: Received %d, round up to min value %d\n",
 			crus_set, MIN_CHAN_SWAP_SAMPLES);
 		crus_set = MIN_CHAN_SWAP_SAMPLES;
 	}
@@ -1134,7 +1134,7 @@ static const struct snd_kcontrol_new crus_no_protect_controls[] = {
 void msm_crus_pb_add_controls(struct snd_soc_component *component)
 {
 	if (this_ctrl.usecase_dt_count == 0)
-		pr_info("CRUS_SP: Usecase config not specified\n");
+		pr_debug("CRUS_SP: Usecase config not specified\n");
 
 	crus_sp_usecase_enum[0].items = this_ctrl.usecase_dt_count;
 	crus_sp_usecase_enum[0].texts = crus_sp_usecase_dt_text;
@@ -1151,7 +1151,7 @@ void msm_crus_pb_add_controls(struct snd_soc_component *component)
 EXPORT_SYMBOL(msm_crus_pb_add_controls);
 int crus_afe_port_start(u16 port_id)
 {
-	pr_info("%s: 0x%x\n", __func__, port_id);
+	pr_debug("%s: 0x%x\n", __func__, port_id);
 #if 0
 //CSPL do not be involved in AFE
 	struct snd_kcontrol kcontrol;
@@ -1161,7 +1161,7 @@ int crus_afe_port_start(u16 port_id)
 		return 0;
 
 	this_ctrl.afe_start = true;
-	pr_info("%s: 0x%x\n", __func__, port_id);
+	pr_debug("%s: 0x%x\n", __func__, port_id);
 
 	mutex_lock(&this_ctrl.sp_lock);
 	msm_routing_crus_sp_usecase_get(&kcontrol,
@@ -1175,14 +1175,14 @@ int crus_afe_port_start(u16 port_id)
 EXPORT_SYMBOL(crus_afe_port_start);
 int crus_afe_port_close(u16 port_id)
 {
-	pr_info("%s: 0x%x\n", __func__, port_id);
+	pr_debug("%s: 0x%x\n", __func__, port_id);
 #if 0
 //CSPL do not be involved in AFE
 	if (port_id != this_ctrl.ff_port)
 		return 0;
 
 	this_ctrl.afe_start = false;
-	pr_info("%s: 0x%x\n", __func__, port_id);
+	pr_debug("%s: 0x%x\n", __func__, port_id);
 #endif
 	return 0;
 }
@@ -1195,7 +1195,7 @@ static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 	uint32_t bufsize = 0, size;
 	void *io_data = NULL;
 
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 
 	if (copy_from_user(&size, arg, sizeof(size))) {
 		pr_err("CRUS_SP: copy_from_user (size) failed\n");
@@ -1223,7 +1223,7 @@ static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 			port = this_ctrl.ff_port;
 		break;
 		default:
-			pr_info("CRUS_SP: Unrecognized port ID (%d)\n",
+			pr_debug("CRUS_SP: Unrecognized port ID (%d)\n",
 				crus_sp_hdr.module_id);
 			port = this_ctrl.ff_port;
 		}
@@ -1254,7 +1254,7 @@ static long crus_sp_shared_ioctl(struct file *f, unsigned int cmd,
 			port = this_ctrl.ff_port;
 		break;
 		default:
-			pr_info("%s: Unrecognized port ID (%d)\n", __func__,
+			pr_debug("%s: Unrecognized port ID (%d)\n", __func__,
 			       crus_sp_hdr.module_id);
 			port = this_ctrl.ff_port;
 		}
@@ -1278,7 +1278,7 @@ exit:
 static long crus_sp_ioctl(struct file *f,
 		unsigned int cmd, unsigned long arg)
 {
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 
 	return crus_sp_shared_ioctl(f, cmd, (void __user *)arg);
 }
@@ -1288,7 +1288,7 @@ static long crus_sp_compat_ioctl(struct file *f,
 {
 	unsigned int cmd64;
 
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 
 	switch (cmd) {
 	case CRUS_SP_IOCTL_GET32:
@@ -1473,7 +1473,7 @@ static int msm_cirrus_playback_probe(struct platform_device *pdev)
 {
 	int i;
 
-	pr_info("CRUS_SP: Initializing platform device\n");
+	pr_debug("CRUS_SP: Initializing platform device\n");
 
 	this_ctrl.usecase_dt_count = of_property_count_strings(pdev->dev.of_node,
 							     "usecase-names");
@@ -1496,7 +1496,7 @@ static int msm_cirrus_playback_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < this_ctrl.usecase_dt_count; i++)
-		pr_info("CRUS_SP: Usecase[%d] = %s\n", i,
+		pr_debug("CRUS_SP: Usecase[%d] = %s\n", i,
 			 crus_sp_usecase_dt_text[i]);
 
 	this_ctrl.prot_en = of_property_read_bool(pdev->dev.of_node,
@@ -1537,7 +1537,7 @@ struct miscdevice crus_sp_misc = {
 
 int __init crus_sp_init(void)
 {
-	pr_info("Initializing misc device\n");
+	pr_debug("Initializing misc device\n");
 	atomic_set(&this_ctrl.callback_wait, 0);
 	atomic_set(&this_ctrl.count_wait, 0);
 	mutex_init(&this_ctrl.param_lock);

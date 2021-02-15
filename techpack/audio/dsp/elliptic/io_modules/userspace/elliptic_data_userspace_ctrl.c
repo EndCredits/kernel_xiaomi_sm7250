@@ -105,7 +105,7 @@ static int device_open(struct inode *inode, struct file *filp)
 
 	if (down_interruptible(&ctrl_device.sem) != 0)
 		return -EEXIST;
-	EL_PRINT_I("Opened device %s", USERSPACE_CTRL_IO_DEVICE_NAME);
+	EL_PRINT_D("Opened device %s", USERSPACE_CTRL_IO_DEVICE_NAME);
 	return 0;
 }
 
@@ -180,7 +180,7 @@ fail:
 static int device_close(struct inode *inode, struct file *filp)
 {
 	up(&ctrl_device.sem);
-	EL_PRINT_I("Closed device %s", USERSPACE_CTRL_IO_DEVICE_NAME);
+	EL_PRINT_D("Closed device %s", USERSPACE_CTRL_IO_DEVICE_NAME);
 	return 0;
 }
 
