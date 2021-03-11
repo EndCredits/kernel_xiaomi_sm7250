@@ -7147,6 +7147,7 @@ static void find_best_target(struct sched_domain *sd, cpumask_t *cpus,
 	struct task_struct *curr_tsk;
 	bool prioritized_task = prefer_high_cap && p->prio <= DEFAULT_PRIO;
 
+	struct task_struct *curr_tsk;
 	/*
 	 * In most cases, target_capacity tracks capacity_orig of the most
 	 * energy efficient CPU candidate, thus requiring to minimise
@@ -7625,6 +7626,14 @@ static void find_best_target(struct sched_domain *sd, cpumask_t *cpus,
 		if (curr_tsk && uclamp_boosted(curr_tsk))
 #endif
 			target_cpu = best_idle_cpu;
+	}
+
+	if (target_cpu != -1 && !idle_cpu(target_cpu) &&
+			best_idle_cpu != -1) {
+		curr_tsk = READ_ONCE(cpu_rq(target_cpu)->curr);
+		if (curr_tsk && schedtune_task_boost_rcu_locked(curr_tsk)) {
+			target_cpu = best_idle_cpu;
+		}
 	}
 
 	if (target_cpu == -1)
