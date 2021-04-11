@@ -6311,7 +6311,10 @@ stune_util(int cpu, unsigned long other_util,
 		      cpu_util_freq_walt(cpu, walt_load) + other_util);
 	long margin = schedtune_cpu_margin_with(util, cpu, NULL);
 
-	return util + margin;
+	if (sched_feat(SCHEDTUNE_BOOST_UTIL))
+		return util + margin;
+	else
+		return util;
 }
 #endif
 
