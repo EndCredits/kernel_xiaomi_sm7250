@@ -115,7 +115,7 @@ struct lruvec_stat {
  * Bitmap of shrinker::id corresponding to memcg-aware shrinkers,
  * which have elements charged to this memcg.
  */
-struct memcg_shrinker_map {
+struct shrinker_info {
 	struct rcu_head rcu;
 	unsigned long map[0];
 };
@@ -134,7 +134,7 @@ struct mem_cgroup_per_node {
 	struct mem_cgroup_reclaim_iter	iter[DEF_PRIORITY + 1];
 
 #ifdef CONFIG_MEMCG_KMEM
-	struct memcg_shrinker_map __rcu	*shrinker_map;
+	struct shrinker_info __rcu *shrinker_info;
 #endif
 	struct rb_node		tree_node;	/* RB tree node */
 	unsigned long		usage_in_excess;/* Set to the value by which */
@@ -1305,8 +1305,8 @@ static inline int memcg_cache_id(struct mem_cgroup *memcg)
 	return memcg ? memcg->kmemcg_id : -1;
 }
 
-int alloc_shrinker_maps(struct mem_cgroup *memcg);
-void free_shrinker_maps(struct mem_cgroup *memcg);
+int alloc_shrinker_info(struct mem_cgroup *memcg);
+void free_shrinker_info(struct mem_cgroup *memcg);
 void set_shrinker_bit(struct mem_cgroup *memcg, int nid, int shrinker_id);
 #else
 #define for_each_memcg_cache_index(_idx)	\
@@ -1330,11 +1330,11 @@ static inline void memcg_put_cache_ids(void)
 {
 }
 
-static inline int alloc_shrinker_maps(struct mem_cgroup *memcg)
+static inline int alloc_shrinker_info(struct mem_cgroup *memcg)
 {
 	return 0;
 }
-static inline void free_shrinker_maps(struct mem_cgroup *memcg) { }
+static inline void free_shrinker_info(struct mem_cgroup *memcg) { }
 
 static inline void set_shrinker_bit(struct mem_cgroup *memcg,
 					  int nid, int shrinker_id) { }
