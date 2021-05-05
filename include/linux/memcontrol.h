@@ -1305,10 +1305,9 @@ static inline int memcg_cache_id(struct mem_cgroup *memcg)
 	return memcg ? memcg->kmemcg_id : -1;
 }
 
-extern int memcg_expand_shrinker_maps(int new_id);
-
-extern void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
-				   int nid, int shrinker_id);
+int alloc_shrinker_maps(struct mem_cgroup *memcg);
+void free_shrinker_maps(struct mem_cgroup *memcg);
+void set_shrinker_bit(struct mem_cgroup *memcg, int nid, int shrinker_id);
 #else
 #define for_each_memcg_cache_index(_idx)	\
 	for (; NULL; )
@@ -1331,7 +1330,13 @@ static inline void memcg_put_cache_ids(void)
 {
 }
 
-static inline void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
+static inline int alloc_shrinker_maps(struct mem_cgroup *memcg)
+{
+	return 0;
+}
+static inline void free_shrinker_maps(struct mem_cgroup *memcg) { }
+
+static inline void set_shrinker_bit(struct mem_cgroup *memcg,
 					  int nid, int shrinker_id) { }
 #endif /* CONFIG_MEMCG_KMEM */
 
