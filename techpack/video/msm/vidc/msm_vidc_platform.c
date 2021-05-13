@@ -980,7 +980,7 @@ static struct msm_vidc_common_data lito_common_data_v0[] = {
 	},
 	{
 		.key = "qcom,decode-batching",
-		.value = 1,
+		.value = 0,
 	},
 	{
 		.key = "qcom,batch-timeout",
@@ -1066,7 +1066,7 @@ static struct msm_vidc_common_data lito_common_data_v1[] = {
 	},
 	{
 		.key = "qcom,decode-batching",
-		.value = 1,
+		.value = 0,
 	},
 	{
 		.key = "qcom,batch-timeout",
@@ -1149,7 +1149,7 @@ static struct msm_vidc_common_data lagoon_common_data_v0[] = {
 	},
 	{
 		.key = "qcom,decode-batching",
-		.value = 1,
+		.value = 0,
 	},
 	{
 		.key = "qcom,batch-timeout",
@@ -1235,7 +1235,7 @@ static struct msm_vidc_common_data lagoon_common_data_v1[] = {
 	},
 	{
 		.key = "qcom,decode-batching",
-		.value = 1,
+		.value = 0,
 	},
 	{
 		.key = "qcom,batch-timeout",
@@ -1328,7 +1328,7 @@ static struct msm_vidc_common_data kona_common_data[] = {
 	},
 	{
 		.key = "qcom,decode-batching",
-		.value = 1,
+		.value = 0,
 	},
 	{
 		.key = "qcom,batch-timeout",
@@ -1656,7 +1656,7 @@ static struct msm_vidc_common_data sm8150_common_data[] = {
 	},
 	{
 		.key = "qcom,decode-batching",
-		.value = 1,
+		.value = 0,
 	},
 	{
 		.key = "qcom,batch-timeout",
