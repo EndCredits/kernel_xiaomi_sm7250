@@ -1661,7 +1661,6 @@ repeat:
 
 	if (page && vma && userfaultfd_minor(vma)) {
 		unlock_page(page);
-		put_page(page);
 		*fault_type = handle_userfault(vmf, VM_UFFD_MINOR);
 		return 0;
 	}
