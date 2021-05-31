@@ -20,6 +20,8 @@
 #include "function/u_ncm.h"
 #endif
 
+#include <linux/power_supply.h>
+
 #ifdef CONFIG_USB_CONFIGFS_F_ACC
 extern int acc_ctrlrequest(struct usb_composite_dev *cdev,
 				const struct usb_ctrlrequest *ctrl);
@@ -1490,6 +1492,7 @@ static void android_work(struct work_struct *data)
 		pr_info("%s: sent uevent %s\n", __func__, configured[0]);
 		smblib_canncel_recheck();
 		uevent_sent = true;
+		smblib_canncel_recheck();
 	}
 
 	if (status[2]) {
