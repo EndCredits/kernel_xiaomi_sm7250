@@ -153,6 +153,7 @@ struct gadget_config_name {
 
 #define MAX_USB_STRING_LEN	126
 #define MAX_USB_STRING_WITH_NULL_LEN	(MAX_USB_STRING_LEN+1)
+#define USB_MAX_STRING_WITH_NULL_LEN	(MAX_USB_STRING_LEN+1)
 #define MSOS_VENDOR_TYPE 0x01
 
 static int usb_string_copy(const char *s, char **s_copy)
@@ -1501,6 +1502,7 @@ static void android_work(struct work_struct *data)
 		pr_info("%s: sent uevent %s\n", __func__, disconnected[0]);
 		uevent_sent = true;
 		gi->isMSOS = false;
+		cdev->isMSOS = false;
 	}
 
 	if (!uevent_sent) {
@@ -1644,6 +1646,7 @@ static int android_setup(struct usb_gadget *gadget,
 		if ((c->bRequest == MSOS_VENDOR_TYPE) &&
 			(c->bRequestType & USB_DIR_IN) && le16_to_cpu(c->wIndex == 4)) {
 			gi->isMSOS = true;
+			cdev->isMSOS = true;
 		}
 	}
 	spin_lock_irqsave(&cdev->lock, flags);
