@@ -497,6 +497,7 @@ static struct platform_driver video_cc_lito_driver = {
 	.driver = {
 		.name = "lito-videocc",
 		.of_match_table = video_cc_lito_match_table,
+		.probe_type = PROBE_FORCE_SYNCHRONOUS,
 	},
 };
 
