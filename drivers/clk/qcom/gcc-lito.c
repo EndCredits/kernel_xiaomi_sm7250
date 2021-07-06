@@ -2696,6 +2696,7 @@ static struct platform_driver gcc_lito_driver = {
 	.driver	= {
 		.name = "gcc-lito",
 		.of_match_table = gcc_lito_match_table,
+		.probe_type = PROBE_FORCE_SYNCHRONOUS,
 	},
 };
 
