@@ -379,6 +379,7 @@ static struct platform_driver gpu_cc_lito_driver = {
 	.driver = {
 		.name = "gpu_cc-lito",
 		.of_match_table = gpu_cc_lito_match_table,
+		.probe_type = PROBE_FORCE_SYNCHRONOUS,
 	},
 };
 
