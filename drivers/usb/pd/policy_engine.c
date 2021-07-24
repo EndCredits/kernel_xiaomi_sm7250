@@ -415,6 +415,7 @@ struct usbpd {
 	bool			peer_usb_comm;
 	bool			peer_pr_swap;
 	bool			peer_dr_swap;
+	bool			no_usb3dp_concurrency;
 
 	u32			sink_caps[7];
 	int			num_sink_caps;
