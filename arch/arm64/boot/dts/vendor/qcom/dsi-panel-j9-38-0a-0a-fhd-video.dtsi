@@ -207,12 +207,10 @@
 				39 00 00 00 00 00 02 B3 13
 				39 00 00 00 00 00 03 F0 A5 A5
 				/* HBM ON 600nit */
-				39 00 00 00 00 00 03 51 03 FF
 				39 01 00 00 00 00 02 53 E0];
 			qcom,mdss-dsi-dispparam-hbm-fod-on-command-state = "dsi_lp_mode";
 			qcom,mdss-dsi-dispparam-hbm-fod-off-command = [
 				15 00 00 00 00 00 02 53 20
-				39 00 00 00 00 00 03 51 03 FF
 				/* ELVSS dimming off */
 				39 00 00 00 00 00 03 F0 5A 5A
 				39 00 00 00 00 00 03 B0 05 B3
