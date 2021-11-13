@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 #ifndef _CAM_REQ_MGR_CORE_H_
 #define _CAM_REQ_MGR_CORE_H_
@@ -13,7 +14,7 @@
 #define CAM_REQ_MGR_MAX_LINKED_DEV     16
 #define MAX_REQ_SLOTS                  48
 
-#define CAM_REQ_MGR_WATCHDOG_TIMEOUT       5000
+#define CAM_REQ_MGR_WATCHDOG_TIMEOUT       3000
 #define CAM_REQ_MGR_WATCHDOG_TIMEOUT_MAX   50000
 #define CAM_REQ_MGR_SCHED_REQ_TIMEOUT      1000
 #define CAM_REQ_MGR_SIMULATE_SCHED_REQ     30
@@ -31,13 +32,12 @@
 
 #define SYNC_LINK_SOF_CNT_MAX_LMT 1
 
-#define MAXIMUM_LINKS_PER_SESSION  7
+#define MAXIMUM_LINKS_PER_SESSION  4
 
-#define MAXIMUM_RETRY_ATTEMPTS 2
+#define MAXIMUM_RETRY_ATTEMPTS 3
 
 #define VERSION_1  1
 #define VERSION_2  2
-#define CAM_REQ_MGR_MAX_TRIGGERS   2
 
 /**
  * enum crm_workq_task_type
@@ -346,11 +346,6 @@ struct cam_req_mgr_connected_device {
  *                         as part of shutdown.
  * @sof_timestamp_value  : SOF timestamp value
  * @prev_sof_timestamp   : Previous SOF timestamp value
- * @dual_trigger         : Links needs to wait for two triggers prior to
- *                         applying the settings
- * @trigger_cnt          : trigger count value per device initiating the trigger
- * @skip_wd_validation   : skip initial frames crm_wd_timer validation in the
- *                         case of long exposure use case
  */
 struct cam_req_mgr_core_link {
 	int32_t                              link_hdl;
@@ -381,10 +376,6 @@ struct cam_req_mgr_core_link {
 	bool                                 is_shutdown;
 	uint64_t                             sof_timestamp;
 	uint64_t                             prev_sof_timestamp;
-	bool                                 dual_trigger;
-	uint32_t    trigger_cnt[CAM_REQ_MGR_MAX_TRIGGERS];
-	bool                                 skip_wd_validation;
-
 };
 
 /**
@@ -418,12 +409,10 @@ struct cam_req_mgr_core_session {
  * - Core camera request manager data struct
  * @session_head : list head holding sessions
  * @crm_lock     : mutex lock to protect session creation & destruction
- * @recovery_on_apply_fail : Recovery on apply failure using debugfs.
  */
 struct cam_req_mgr_core_device {
 	struct list_head             session_head;
 	struct mutex                 crm_lock;
-	bool                         recovery_on_apply_fail;
 };
 
 /**
@@ -517,10 +506,4 @@ void cam_req_mgr_handle_core_shutdown(void);
  */
 int cam_req_mgr_link_control(struct cam_req_mgr_link_control *control);
 
-/**
- * cam_req_mgr_dump_request()
- * @brief:   Dumps the request information
- * @dump_req: Dump request
- */
-int cam_req_mgr_dump_request(struct cam_dump_req_cmd *dump_req);
 #endif
