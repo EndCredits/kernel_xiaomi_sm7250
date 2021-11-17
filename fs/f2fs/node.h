@@ -136,14 +136,11 @@ static inline bool excess_dirty_nats(struct f2fs_sb_info *sbi)
 static inline bool excess_cached_nats(struct f2fs_sb_info *sbi)
 {
 	return NM_I(sbi)->nat_cnt[TOTAL_NAT] >= DEF_NAT_CACHE_THRESHOLD;
-<<<<<<< HEAD
 }
 
 static inline bool excess_dirty_nodes(struct f2fs_sb_info *sbi)
 {
 	return get_pages(sbi, F2FS_DIRTY_NODES) >= sbi->blocks_per_seg * 8;
-=======
->>>>>>> c79c4827e0ed88f2a1c8aae428ccf6da3c104bfe
 }
 
 enum mem_type {

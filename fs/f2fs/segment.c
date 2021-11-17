@@ -2754,11 +2754,6 @@ bool f2fs_segment_has_free_slot(struct f2fs_sb_info *sbi, int segno)
 	return __next_free_blkoff(sbi, segno, 0) < sbi->blocks_per_seg;
 }
 
-bool f2fs_segment_has_free_slot(struct f2fs_sb_info *sbi, int segno)
-{
-	return __next_free_blkoff(sbi, segno, 0) < sbi->blocks_per_seg;
-}
-
 /*
  * This function always allocates a used segment(from dirty seglist) by SSR
  * manner, so it should recover the existing segment information of valid blocks
