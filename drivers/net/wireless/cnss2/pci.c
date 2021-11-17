@@ -43,6 +43,7 @@
 #define DEFAULT_FW_FILE_NAME		"amss.bin"
 #define FW_V2_FILE_NAME			"amss20.bin"
 #define FW_V2_NUMBER			2
+#define DEVICE_MAJOR_VERSION_MASK	0xF
 
 #define WAKE_MSI_NAME			"WAKE"
 
@@ -1884,9 +1885,9 @@ static void cnss_pci_dump_qca6390_sram_mem(struct cnss_pci_data *pci_priv)
 	sbl_log_size = (sbl_log_size > QCA6390_DEBUG_SBL_LOG_SRAM_MAX_SIZE ?
 			QCA6390_DEBUG_SBL_LOG_SRAM_MAX_SIZE : sbl_log_size);
 
-	if (sbl_log_start < QCA6390_V2_SBL_DATA_START ||
-	    sbl_log_start > QCA6390_V2_SBL_DATA_END ||
-	    (sbl_log_start + sbl_log_size) > QCA6390_V2_SBL_DATA_END)
+	if (sbl_log_start < SRAM_START ||
+	    sbl_log_start > SRAM_END ||
+	    (sbl_log_start + sbl_log_size) > SRAM_END)
 		goto out;
 
 	cnss_pr_dbg("Dumping SBL log data\n");
@@ -1954,17 +1955,11 @@ static void cnss_pci_dump_bl_sram_mem(struct cnss_pci_data *pci_priv)
 
 	sbl_log_size = (sbl_log_size > QCA6490_DEBUG_SBL_LOG_SRAM_MAX_SIZE ?
 			QCA6490_DEBUG_SBL_LOG_SRAM_MAX_SIZE : sbl_log_size);
-	if (plat_priv->device_version.major_version == FW_V2_NUMBER) {
-		if (sbl_log_start < QCA6490_V2_SBL_DATA_START ||
-		    sbl_log_start > QCA6490_V2_SBL_DATA_END ||
-		    (sbl_log_start + sbl_log_size) > QCA6490_V2_SBL_DATA_END)
-			goto out;
-	} else {
-		if (sbl_log_start < QCA6490_V1_SBL_DATA_START ||
-		    sbl_log_start > QCA6490_V1_SBL_DATA_END ||
-		    (sbl_log_start + sbl_log_size) > QCA6490_V1_SBL_DATA_END)
-			goto out;
-	}
+
+	if (sbl_log_start < SRAM_START ||
+	    sbl_log_start > SRAM_END ||
+	    (sbl_log_start + sbl_log_size) > SRAM_END)
+		goto out;
 
 	cnss_pr_dbg("Dumping SBL log data");
 	for (i = 0; i < sbl_log_size; i += sizeof(val)) {
@@ -4535,6 +4530,9 @@ static int cnss_pci_update_fw_name(struct cnss_pci_data *pci_priv)
 		    plat_priv->device_version.device_number,
 		    plat_priv->device_version.major_version,
 		    plat_priv->device_version.minor_version);
+
+	/* Only keep lower 4 bits as real device major version */
+	plat_priv->device_version.major_version &= DEVICE_MAJOR_VERSION_MASK;
 
 	switch (pci_priv->device_id) {
 	case QCA6390_DEVICE_ID:
