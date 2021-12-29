@@ -37,6 +37,7 @@
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-lp11-init;
+		qcom,mdss-dsi-init-delay-us = <5000>;
 		qcom.mdss-dsi-lane-map = "lane_map_0123";
 		qcom,mdss-dsi-lane-0-state;
 		qcom,mdss-dsi-lane-1-state;
@@ -44,7 +45,7 @@
 		qcom,mdss-dsi-lane-3-state;
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
-		qcom,mdss-dsi-reset-sequence = <0 1>, <1 5>;
+		qcom,mdss-dsi-reset-sequence = <0 1>, <1 10>;
 		qcom,mdss-pan-physical-width-dimension = <68>;
 		qcom,mdss-pan-physical-height-dimension = <152>;
 		qcom,mdss-dsi-wr-mem-start = <0x2c>;
@@ -59,8 +60,6 @@
 		qcom,mdss-dsi-panel-xy-coordinate = <0x0F 0x18>;
 		qcom,mdss-dsi-panel-max-luminance = <0x0F 0x20>;
 		qcom,mdss-dsi-panel-max-luminance-valid = <0x01 0x01>;
-		qcom,dsi-dyn-clk-enable;
-		qcom,dsi-dyn-clk-list = <1106657280 1096282368>;
 
 		qcom,mdss-dsi-display-timings {
 			timing@0{
@@ -80,7 +79,7 @@
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
 
-				qcom,mdss-dsi-post-panel-on-command = [
+				qcom,mdss-dsi-on-command = [
 						05 01 00 00 14 00 02 11 00
 						39 00 00 00 00 00 02 35 00
 						/* FAIL SAFE Setting */
@@ -116,18 +115,19 @@
 						05 01 00 00 00 00 02 29 00
 				];
 
-				qcom,mdss-dsi-pre-off-command = [
+				qcom,mdss-dsi-off-command = [
 						05 00 00 00 00 00 02 28 00
 						05 01 00 00 96 00 02 10 00];
 				qcom,mdss-dsi-displayoff-command = [05 01 00 00 20 00 02 28 00];
 				qcom,mdss-dsi-displayon-command = [05 01 00 00 14 00 02 29 00];
 				qcom,mdss-dsi-nolp-command = [39 01 00 00 00 00 03 51 00 00];
 				qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-off-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-post-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-pre-off-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-displayoff-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-displayon-command-state = "dsi_hs_mode";
-				qcom,mdss-dsi-nolp-command-state = "dsi_hs_mode";
+				qcom,mdss-dsi-nolp-command-state = "dsi_lp_mode";
 
 			};
 		};
@@ -146,18 +146,16 @@
 	mi,esd-err-irq-gpio = <&tlmm 55 0x2002>;
 	mi,mdss-panel-on-dimming-enable;
 	mi,mdss-panel-on-dimming-delay = <120>;
+	mi,mdss-panel-prepare-before-fod-hbm-on;
 	mi,disp-fod-off-dimming-delay = <85>;
 
 	// mi,elvss_dimming_check_enable;
 	mi,mdss-dsi-elvss-dimming-register-read-length = <1>;
 	mi,mdss-dsi-elvss-dimming-update-hbm-fod-on-index = <4>;
 	mi,mdss-dsi-elvss-dimming-update-hbm-fod-off-index = <7>;
-	mi,mdss-dsi-panel-dc-on-hs-enable;
-	mi,mdss-dsi-panel-dc-threshold = <538>;
-	mi,mdss-dsi-panel-dc-type = <1>;
 
-	/* enable nolp command set backlight */
-	qcom,mdss-dsi-nolp-command-set-backlight-enabled;
+	mi,mdss-dsi-panel-dc-threshold = <470>;
+	mi,mdss-dsi-panel-dc-type = <1>;
 
 	/* AOD brightness setting */
 	mi,mdss-dsi-doze-hbm-brightness-value = <270>;
@@ -208,7 +206,7 @@
 				39 00 00 00 00 00 03 F0 A5 A5
 				/* HBM ON 600nit */
 				39 01 00 00 00 00 02 53 E0];
-			qcom,mdss-dsi-dispparam-hbm-fod-on-command-state = "dsi_lp_mode";
+			qcom,mdss-dsi-dispparam-hbm-fod-on-command-state = "dsi_hs_mode";
 			qcom,mdss-dsi-dispparam-hbm-fod-off-command = [
 				15 00 00 00 00 00 02 53 20
 				/* ELVSS dimming off */
@@ -313,7 +311,7 @@
 				/* CRC Bypass */
 				39 00 00 00 00 00 02 B1 01
 				39 01 00 00 00 00 03 F0 A5 A5];
-			mi,mdss-dsi-crc-off-command-state = "dsi_hs_mode";
+			mi,mdss-dsi-crc-off-command-state = "dsi_lp_mode";
 		};
 	};
 };
