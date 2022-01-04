@@ -504,11 +504,12 @@ ifdef CONFIG_POLLY_CLANG
 KBUILD_CFLAGS += -mllvm -polly \
 		   -mllvm -polly-run-dce \
 		   -mllvm -polly-run-inliner \
-                   -mllvm -polly-isl-arg=--no-schedule-serialize-sccs \
-		   -mllvm -polly-opt-fusion=max \
+           -mllvm -polly-isl-arg=--no-schedule-serialize-sccs \
 		   -mllvm -polly-ast-use-context \
-                   -mllvm -polly-detect-keep-going \
+           -mllvm -polly-detect-keep-going \
+           -mllvm -polly-position=before-vectorizer \
 		   -mllvm -polly-vectorizer=stripmine \
+           -mllvm -polly-detect-profitability-min-per-loop-insts=40 \
 		   -mllvm -polly-invariant-load-hoisting
 endif
 ifneq ($(CROSS_COMPILE),)
