@@ -1402,7 +1402,6 @@
 		qcom,bark-time = <20000>;
 		qcom,pet-time = <15000>;
 		qcom,ipi-ping;
-		qcom,wakeup-enable;
 	};
 
 	jtag_mm0: jtagmm@7040000 {
