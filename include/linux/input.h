@@ -229,6 +229,8 @@ struct input_dev {
 #endif
 
 	ktime_t timestamp[INPUT_CLK_MAX];
+
+	bool should_be_denied;
 };
 #define to_input_dev(d) container_of(d, struct input_dev, dev)
 

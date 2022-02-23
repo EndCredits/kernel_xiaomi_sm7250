@@ -47,6 +47,12 @@
 #define UINPUT_BUFFER_SIZE	16
 #define UINPUT_NUM_REQUESTS	16
 
+#define DENIED_FPC_NAME "fpc"
+
+static inline bool is_fpc(const char* name) {
+	return strstr(name, DENIED_FPC_NAME) != NULL;
+}
+
 enum uinput_state { UIST_NEW_DEVICE, UIST_SETUP_COMPLETE, UIST_CREATED };
 
 struct uinput_request {
@@ -558,6 +564,7 @@ static int uinput_setup_device_legacy(struct uinput_device *udev,
 		goto exit;
 	}
 
+	dev->should_be_denied = is_fpc(dev->name);
 	dev->id.bustype	= user_dev->id.bustype;
 	dev->id.vendor	= user_dev->id.vendor;
 	dev->id.product	= user_dev->id.product;
@@ -587,6 +594,10 @@ static ssize_t uinput_inject_events(struct uinput_device *udev,
 {
 	struct input_event ev;
 	size_t bytes = 0;
+
+	/* 10 means nothing but it just works and fpc fingerprint hal won't complain about this */
+	if (udev->dev->should_be_denied)
+		return 10;
 
 	if (count != 0 && count < input_event_size())
 		return -EINVAL;
