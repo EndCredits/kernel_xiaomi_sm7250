@@ -78,6 +78,12 @@ static unsigned long super_cache_scan(struct shrinker *shrink,
 	if (!trylock_super(sb))
 		return SHRINK_STOP;
 
+	/* This prevents inode eviction that requires SB_FREEZE_FS. */
+	if (sb->s_writers.frozen == SB_FREEZE_FS) {
+		up_read(&sb->s_umount);
+		return SHRINK_STOP;
+	}
+
 	if (sb->s_op->nr_cached_objects)
 		fs_objects = sb->s_op->nr_cached_objects(sb, sc);
 
