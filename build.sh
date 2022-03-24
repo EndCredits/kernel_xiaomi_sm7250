@@ -22,7 +22,7 @@ CC_ADDITION_FLAGS="OBJDUMP=llvm-objdump";
 OUT="../out";
 
 TARGET_KERNEL_FILE=arch/arm64/boot/Image;
-TARGET_KERNEL_DTB=arch/arm64/boot/dts/vendor/qcom/dtb;
+TARGET_KERNEL_DTB=arch/arm64/boot/dtb;
 TARGET_KERNEL_DTBO=arch/arm64/boot/dtbo.img
 TARGET_KERNEL_NAME=Kernel;
 TARGET_KERNEL_MOD_VERSION=4.19.236;
@@ -32,7 +32,7 @@ DEFCONFIG_NAME=vendor/picasso_user_defconfig;
 START_SEC=$(date +%s);
 CURRENT_TIME=$(date '+%Z-%Y-%m-%d-%H%M');
 
-ANYKERNEL_URL=https://github.com/EndCredits/AnyKernel3/archive/refs/heads/picasso.zip;
+ANYKERNEL_URL=https://codeload.github.com/EndCredits/AnyKernel3/zip/refs/heads/picasso;
 ANYKERNEL_PATH=AnyKernel3-picasso;
 ANYKERNEL_FILE=anykernel.zip;
 
@@ -84,6 +84,6 @@ generate_flashable(){
 }
 
 make_defconfig;
-build_kernel;
 link_all_dtb_files;
+build_kernel;
 generate_flashable;
