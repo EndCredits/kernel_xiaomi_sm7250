@@ -19,7 +19,7 @@ CROSS_COMPILE=aarch64-linux-gnu-;
 CROSS_COMPILE_COMPAT=arm-linux-gnueabi-;
 THREAD=$(nproc --all);
 CC_ADDITION_FLAGS="OBJDUMP=llvm-objdump";
-OUT=out;
+OUT="../out";
 
 TARGET_KERNEL_FILE=arch/arm64/boot/Image;
 TARGET_KERNEL_DTB=arch/arm64/boot/dts/vendor/qcom/dtb;
@@ -35,6 +35,10 @@ CURRENT_TIME=$(date '+%Z-%Y-%m-%d-%H%M');
 ANYKERNEL_URL=https://github.com/EndCredits/AnyKernel3/archive/refs/heads/picasso.zip;
 ANYKERNEL_PATH=AnyKernel3-picasso;
 ANYKERNEL_FILE=anykernel.zip;
+
+link_all_dtb_files(){
+    find $OUT/arch/arm64/boot/dts/vendor/qcom -name '*.dtb' -exec cat {} + > $OUT/arch/arm64/boot/dtb;
+}
 
 make_defconfig(){
     echo "------------------------------";
@@ -81,4 +85,5 @@ generate_flashable(){
 
 make_defconfig;
 build_kernel;
+link_all_dtb_files;
 generate_flashable;
