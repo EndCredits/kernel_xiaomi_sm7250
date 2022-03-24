@@ -2,7 +2,7 @@
 #
 #  build.sh - Automic kernel building script for Rosemary Kernel
 #
-#  Copyright (C) 2021, Crepuscular's AOSP WorkGroup
+#  Copyright (C) 2021-2022, Crepuscular's AOSP WorkGroup
 #  Author: EndCredits <alicization.han@gmail.com>
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -16,22 +16,24 @@ ARCH=arm64;
 CC=clang;
 CLANG_TRIPLE=aarch64-linux-gnu-;
 CROSS_COMPILE=aarch64-linux-gnu-;
-CROSS_COMPILE_ARM32=arm-linux-gnueabi-;
+CROSS_COMPILE_COMPAT=arm-linux-gnueabi-;
 THREAD=$(nproc --all);
+CC_ADDITION_FLAGS="OBJDUMP=llvm-objdump";
 OUT=out;
 
-TARGET_KERNEL_FILE=arch/arm64/boot/Image.gz-dtb;
-TARGET_KERNEL_DTB=arch/arm64/boot/dts/qcom/msm8953-qrd-sku3-tiffany.dtb;
-TARGET_KERNEL_NAME=Rosemary-Kernel;
-TARGET_KERNEL_MOD_VERSION=2.2;
+TARGET_KERNEL_FILE=arch/arm64/boot/Image;
+TARGET_KERNEL_DTB=arch/arm64/boot/dts/vendor/qcom/dtb;
+TARGET_KERNEL_DTBO=arch/arm64/boot/dtbo.img
+TARGET_KERNEL_NAME=Kernel;
+TARGET_KERNEL_MOD_VERSION=4.19.236;
 
-DEFCONFIG_NAME=tiffany_defconfig;
+DEFCONFIG_NAME=vendor/picasso_user_defconfig;
 
 START_SEC=$(date +%s);
 CURRENT_TIME=$(date '+%Z-%Y-%m-%d-%H%M');
 
-ANYKERNEL_URL=https://codeload.github.com/EndCredits/AnyKernel3/zip/refs/heads/rosemary;
-ANYKERNEL_PATH=AnyKernel3-rosemary;
+ANYKERNEL_URL=https://github.com/EndCredits/AnyKernel3/archive/refs/heads/picasso.zip;
+ANYKERNEL_PATH=AnyKernel3-picasso;
 ANYKERNEL_FILE=anykernel.zip;
 
 make_defconfig(){
@@ -39,7 +41,7 @@ make_defconfig(){
     echo " Building Kernel Defconfig..";
     echo "------------------------------";
 
-    make CC=$CC ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 O=$OUT -j$THREAD $DEFCONFIG_NAME;
+    make CC=$CC ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE CROSS_COMPILE_COMPAT=$CROSS_COMPILE_COMPAT O=$OUT -j$THREAD $DEFCONFIG_NAME;
 }
 
 build_kernel(){
@@ -47,7 +49,7 @@ build_kernel(){
     echo " Building Kernel ...........";
     echo "------------------------------";
 
-    make CC=$CC ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 O=$OUT -j$THREAD;
+    make CC=$CC ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE CROSS_COMPILE_COMPAT=$CROSS_COMPILE_COMPAT $CC_ADDITION_FLAGS O=$OUT -j$THREAD;
     END_SEC=$(date +%s);
     COST_SEC=$[ $END_SEC-$START_SEC ];
     echo "Kernel Build Costed $(($COST_SEC/60))min $(($COST_SEC%60))s"
