@@ -84,6 +84,6 @@ generate_flashable(){
 }
 
 make_defconfig;
-link_all_dtb_files;
 build_kernel;
+link_all_dtb_files;
 generate_flashable;
