@@ -72,9 +72,13 @@ generate_flashable(){
 
     unzip -o $ANYKERNEL_FILE;
 
+    echo ' Removing old package file ';
+    rm -rf $ANYKERNEL_PATH/Kernel-CST-*;
+
     echo ' Copying Kernel File '; 
     cp -r $TARGET_KERNEL_FILE $ANYKERNEL_PATH/;
     cp -r $TARGET_KERNEL_DTB $ANYKERNEL_PATH/;
+    cp -r $TARGET_KERNEL_DTBO $ANYKERNEL_PATH/;
 
     echo ' Packaging flashable Kernel ';
     cd $ANYKERNEL_PATH;
