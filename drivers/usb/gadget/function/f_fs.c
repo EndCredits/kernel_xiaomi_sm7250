@@ -2092,6 +2092,7 @@ static void ffs_epfiles_destroy(struct ffs_epfile *epfiles, unsigned count)
 static void ffs_func_eps_disable(struct ffs_function *func)
 {
 	struct ffs_ep *ep;
+	struct ffs_data *ffs;
 	struct ffs_epfile *epfile;
 	unsigned short count;
 	unsigned long flags;
@@ -2099,6 +2100,7 @@ static void ffs_func_eps_disable(struct ffs_function *func)
 	spin_lock_irqsave(&func->ffs->eps_lock, flags);
 	count = func->ffs->eps_count;
 	epfile = func->ffs->epfiles;
+	ffs = func->ffs;
 	ep = func->eps;
 	while (count--) {
 		/* pending requests get nuked */

@@ -898,13 +898,6 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.matches = has_ssbd_mitigation,
 		.midr_range_list = arm64_ssb_cpus,
 	},
-#ifdef CONFIG_ARM64_ERRATUM_1188873
-	{
-		.desc = "ARM erratum 1188873",
-		.capability = ARM64_WORKAROUND_1188873,
-		ERRATA_MIDR_RANGE_LIST(arm64_workaround_1188873_cpus),
-	},
-#endif
 	{
 		.desc = "Spectre-BHB",
 		.capability = ARM64_SPECTRE_BHB,
@@ -912,6 +905,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.matches = is_spectre_bhb_affected,
 		.cpu_enable = spectre_bhb_enable_mitigation,
 	},
+#ifdef CONFIG_ARM64_ERRATUM_1188873
+	{
+		.desc = "ARM erratum 1188873",
+		.capability = ARM64_WORKAROUND_1188873,
+		ERRATA_MIDR_RANGE_LIST(arm64_workaround_1188873_cpus),
+	},
+#endif
 #ifdef CONFIG_ARM64_ERRATUM_1463225
 	{
 		.desc = "ARM erratum 1463225",
