@@ -132,6 +132,15 @@ bool wlan_reg_is_24ghz_ch_freq(qdf_freq_t freq);
 #define WLAN_REG_IS_5GHZ_CH_FREQ(freq) wlan_reg_is_5ghz_ch_freq(freq)
 bool wlan_reg_is_5ghz_ch_freq(qdf_freq_t freq);
 
+/**
+ * wlan_reg_is_freq_indoor() - Check if a frequency is indoor.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency.
+ *
+ * Return: Return true if a frequency is indoor, else false.
+ */
+bool wlan_reg_is_freq_indoor(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
+
 #ifdef CONFIG_BAND_6GHZ
 /**
  * wlan_reg_is_6ghz_chan_freq() - Check if the given channel frequency is 6GHz
@@ -1294,4 +1303,16 @@ wlan_reg_country_chan_opclass_to_freq(struct wlan_objmgr_pdev *pdev,
 uint16_t wlan_reg_chan_opclass_to_freq(uint8_t chan,
 				       uint8_t op_class,
 				       bool global_tbl_lookup);
+#ifdef CONFIG_REG_CLIENT
+/**
+ * wlan_reg_band_bitmap_to_band_info() - Convert the band_bitmap to a
+ *	band_info enum
+ * @band_bitmap: bitmap on top of reg_wifi_band of bands enabled
+ *
+ * Return: BAND_ALL if both 2G and 5G band is enabled
+ *	BAND_2G if 2G is enabled but 5G isn't
+ *	BAND_5G if 5G is enabled but 2G isn't
+ */
+enum band_info wlan_reg_band_bitmap_to_band_info(uint32_t band_bitmap);
+#endif
 #endif

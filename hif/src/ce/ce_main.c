@@ -57,6 +57,10 @@
 #define QCA_WIFI_SUPPORT_SRNG
 #endif
 
+#ifdef QCA_WIFI_SUPPORT_SRNG
+#include <hal_api.h>
+#endif
+
 /* Forward references */
 QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info);
 
@@ -983,11 +987,14 @@ static QDF_STATUS ce_alloc_desc_ring(struct hif_softc *scn, unsigned int CE_id,
 						scn->ipa_ce_ring->vaddr;
 	} else {
 		ce_ring->base_addr_owner_space_unaligned =
-			qdf_mem_alloc_consistent(scn->qdf_dev,
-						 scn->qdf_dev->dev,
-						 (nentries * desc_size +
-						 CE_DESC_RING_ALIGN),
-						 base_addr);
+			hif_mem_alloc_consistent_unaligned
+					(scn,
+					 (nentries * desc_size +
+					  CE_DESC_RING_ALIGN),
+					 base_addr,
+					 ce_ring->hal_ring_type,
+					 &ce_ring->is_ring_prealloc);
+
 		if (!ce_ring->base_addr_owner_space_unaligned) {
 			HIF_ERROR("%s: Failed to allocate DMA memory for ce ring id : %u",
 				  __func__, CE_id);
@@ -1018,10 +1025,12 @@ static void ce_free_desc_ring(struct hif_softc *scn, unsigned int CE_id,
 		}
 		ce_ring->base_addr_owner_space_unaligned = NULL;
 	} else {
-		qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
-			ce_ring->nentries * desc_size + CE_DESC_RING_ALIGN,
-			ce_ring->base_addr_owner_space_unaligned,
-			ce_ring->base_addr_CE_space, 0);
+		hif_mem_free_consistent_unaligned
+			(scn,
+			 ce_ring->nentries * desc_size + CE_DESC_RING_ALIGN,
+			 ce_ring->base_addr_owner_space_unaligned,
+			 ce_ring->base_addr_CE_space, 0,
+			 ce_ring->is_ring_prealloc);
 		ce_ring->base_addr_owner_space_unaligned = NULL;
 	}
 }
@@ -1032,9 +1041,14 @@ static QDF_STATUS ce_alloc_desc_ring(struct hif_softc *scn, unsigned int CE_id,
 				     unsigned int nentries, uint32_t desc_size)
 {
 	ce_ring->base_addr_owner_space_unaligned =
-		qdf_mem_alloc_consistent(scn->qdf_dev, scn->qdf_dev->dev,
+			hif_mem_alloc_consistent_unaligned
+					(scn,
 					 (nentries * desc_size +
-					 CE_DESC_RING_ALIGN), base_addr);
+					  CE_DESC_RING_ALIGN),
+					 base_addr,
+					 ce_ring->hal_ring_type,
+					 &ce_ring->is_ring_prealloc);
+
 	if (!ce_ring->base_addr_owner_space_unaligned) {
 		HIF_ERROR("%s: Failed to allocate DMA memory for ce ring id : %u",
 			  __func__, CE_id);
@@ -1046,10 +1060,12 @@ static QDF_STATUS ce_alloc_desc_ring(struct hif_softc *scn, unsigned int CE_id,
 static void ce_free_desc_ring(struct hif_softc *scn, unsigned int CE_id,
 			      struct CE_ring_state *ce_ring, uint32_t desc_size)
 {
-	qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
-		ce_ring->nentries * desc_size + CE_DESC_RING_ALIGN,
-		ce_ring->base_addr_owner_space_unaligned,
-		ce_ring->base_addr_CE_space, 0);
+	hif_mem_free_consistent_unaligned
+		(scn,
+		 ce_ring->nentries * desc_size + CE_DESC_RING_ALIGN,
+		 ce_ring->base_addr_owner_space_unaligned,
+		 ce_ring->base_addr_CE_space, 0,
+		 ce_ring->is_ring_prealloc);
 	ce_ring->base_addr_owner_space_unaligned = NULL;
 }
 #endif /* IPA_OFFLOAD */
@@ -1145,7 +1161,26 @@ static inline uint32_t ce_get_desc_size(struct hif_softc *scn,
 	return hif_state->ce_services->ce_get_desc_size(ring_type);
 }
 
-
+#ifdef QCA_WIFI_SUPPORT_SRNG
+static inline int32_t ce_ring_type_to_hal_ring_type(uint32_t ce_ring_type)
+{
+	switch (ce_ring_type) {
+	case CE_RING_SRC:
+		return CE_SRC;
+	case CE_RING_DEST:
+		return CE_DST;
+	case CE_RING_STATUS:
+		return CE_DST_STATUS;
+	default:
+		return -EINVAL;
+	}
+}
+#else
+static int32_t ce_ring_type_to_hal_ring_type(uint32_t ce_ring_type)
+{
+	return 0;
+}
+#endif
 static struct CE_ring_state *ce_alloc_ring_state(struct CE_state *CE_state,
 		uint8_t ring_type, uint32_t nentries)
 {
@@ -1170,6 +1205,7 @@ static struct CE_ring_state *ce_alloc_ring_state(struct CE_state *CE_state,
 	ce_ring->low_water_mark_nentries = 0;
 	ce_ring->high_water_mark_nentries = nentries;
 	ce_ring->per_transfer_context = (void **)ptr;
+	ce_ring->hal_ring_type = ce_ring_type_to_hal_ring_type(ring_type);
 
 	desc_size = ce_get_desc_size(scn, ring_type);
 
@@ -3353,7 +3389,6 @@ void hif_unconfig_ce(struct hif_softc *hif_sc)
  */
 static void hif_post_static_buf_to_target(struct hif_softc *scn)
 {
-	void *target_va;
 	phys_addr_t target_pa;
 	struct ce_info *ce_info_ptr;
 	uint32_t msi_data_start;
@@ -3362,15 +3397,19 @@ static void hif_post_static_buf_to_target(struct hif_softc *scn)
 	uint32_t i = 0;
 	int ret;
 
-	target_va = qdf_mem_alloc_consistent(scn->qdf_dev,
-					     scn->qdf_dev->dev,
-					     FW_SHARED_MEM +
-					     sizeof(struct ce_info),
-					     &target_pa);
-	if (!target_va)
+	scn->vaddr_qmi_bypass =
+			(uint32_t *)qdf_mem_alloc_consistent(scn->qdf_dev,
+							     scn->qdf_dev->dev,
+							     FW_SHARED_MEM,
+							     &target_pa);
+	if (!scn->vaddr_qmi_bypass) {
+		hif_err("Memory allocation failed could not post target buf");
 		return;
+	}
 
-	ce_info_ptr = (struct ce_info *)target_va;
+	scn->paddr_qmi_bypass = target_pa;
+
+	ce_info_ptr = (struct ce_info *)scn->vaddr_qmi_bypass;
 
 	if (scn->vaddr_rri_on_ddr) {
 		ce_info_ptr->rri_over_ddr_low_paddr  =
@@ -3394,7 +3433,26 @@ static void hif_post_static_buf_to_target(struct hif_softc *scn)
 	}
 
 	hif_write32_mb(scn, scn->mem + BYPASS_QMI_TEMP_REGISTER, target_pa);
-	hif_info("target va %pK target pa %pa", target_va, &target_pa);
+	hif_info("target va %pK target pa %pa", scn->vaddr_qmi_bypass,
+		 &target_pa);
+}
+
+/**
+ * hif_cleanup_static_buf_to_target() -  clean up static buffer to WLAN FW
+ * @scn: pointer to HIF structure
+ *
+ *
+ * Return: void
+ */
+void hif_cleanup_static_buf_to_target(struct hif_softc *scn)
+{
+	void *target_va = scn->vaddr_qmi_bypass;
+	phys_addr_t target_pa = scn->paddr_qmi_bypass;
+
+	qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
+				FW_SHARED_MEM, target_va,
+				target_pa, 0);
+	hif_write32_mb(scn, scn->mem + BYPASS_QMI_TEMP_REGISTER, 0);
 }
 #else
 /**
@@ -3407,22 +3465,47 @@ static void hif_post_static_buf_to_target(struct hif_softc *scn)
  */
 static void hif_post_static_buf_to_target(struct hif_softc *scn)
 {
-	void *target_va;
-	phys_addr_t target_pa;
+	qdf_dma_addr_t target_pa;
 
-	target_va = qdf_mem_alloc_consistent(scn->qdf_dev, scn->qdf_dev->dev,
-				FW_SHARED_MEM, &target_pa);
-	if (!target_va) {
-		HIF_TRACE("Memory allocation failed could not post target buf");
+	scn->vaddr_qmi_bypass =
+			(uint32_t *)qdf_mem_alloc_consistent(scn->qdf_dev,
+							     scn->qdf_dev->dev,
+							     FW_SHARED_MEM,
+							     &target_pa);
+	if (!scn->vaddr_qmi_bypass) {
+		hif_err("Memory allocation failed could not post target buf");
 		return;
 	}
+
+	scn->paddr_qmi_bypass = target_pa;
 	hif_write32_mb(scn, scn->mem + BYPASS_QMI_TEMP_REGISTER, target_pa);
-	HIF_TRACE("target va %pK target pa %pa", target_va, &target_pa);
+}
+
+/**
+ * hif_cleanup_static_buf_to_target() -  clean up static buffer to WLAN FW
+ * @scn: pointer to HIF structure
+ *
+ *
+ * Return: void
+ */
+void hif_cleanup_static_buf_to_target(struct hif_softc *scn)
+{
+	void *target_va = scn->vaddr_qmi_bypass;
+	phys_addr_t target_pa = scn->paddr_qmi_bypass;
+
+	qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
+				FW_SHARED_MEM, target_va,
+				target_pa, 0);
+	hif_write32_mb(snc, scn->mem + BYPASS_QMI_TEMP_REGISTER, 0);
 }
 #endif
 
 #else
 static inline void hif_post_static_buf_to_target(struct hif_softc *scn)
+{
+}
+
+void hif_cleanup_static_buf_to_target(struct hif_softc *scn)
 {
 }
 #endif
@@ -4208,6 +4291,9 @@ void hif_log_ce_info(struct hif_softc *scn, uint8_t *data,
 	info.ce_count = curr_index;
 	size = sizeof(info) -
 		(CE_COUNT_MAX - info.ce_count) * sizeof(struct ce_index);
+
+	if (*offset + size > QDF_WLAN_HANG_FW_OFFSET)
+		return;
 
 	QDF_HANG_EVT_SET_HDR(&info.tlv_header, HANG_EVT_TAG_CE_INFO,
 			     size - QDF_HANG_EVENT_TLV_HDR_SIZE);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -155,6 +155,7 @@ void hif_exec_destroy(struct hif_exec_context *ctx);
 
 int hif_grp_irq_configure(struct hif_softc *scn,
 			  struct hif_exec_context *hif_exec);
+void hif_grp_irq_deconfigure(struct hif_softc *scn);
 irqreturn_t hif_ext_group_interrupt_handler(int irq, void *context);
 
 struct hif_exec_context *hif_exec_get_ctx(struct hif_opaque_softc *hif,
@@ -186,6 +187,15 @@ void hif_pci_irq_set_affinity_hint(
  */
 void hif_pci_ce_irq_set_affinity_hint(
 	struct hif_softc *scn);
+
+/**
+ * hif_pci_ce_irq_remove_affinity_hint() - remove affinity for the irq
+ * @irq: irq number to remove affinity from
+ */
+static inline void hif_pci_ce_irq_remove_affinity_hint(int irq)
+{
+	hif_irq_affinity_remove(irq);
+}
 #else
 static inline void hif_pci_irq_set_affinity_hint(
 	struct hif_exec_context *hif_ext_group)
@@ -193,6 +203,9 @@ static inline void hif_pci_irq_set_affinity_hint(
 }
 static inline void hif_pci_ce_irq_set_affinity_hint(
 	struct hif_softc *scn)
+{
+}
+static inline void hif_pci_ce_irq_remove_affinity_hint(int irq)
 {
 }
 #endif /* ifdef HIF_CPU_PERF_AFFINE_MASK */

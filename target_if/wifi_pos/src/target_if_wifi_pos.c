@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,6 +92,7 @@ static QDF_STATUS target_if_wifi_pos_get_indirect_data(
 	void *paddr = NULL;
 	uint32_t addr_hi;
 	uint8_t ring_idx = 0, num_rings;
+	uint32_t allocated_len;
 
 	if (!indirect) {
 		target_if_debug("no indirect data. regular event received");
@@ -104,6 +105,16 @@ static QDF_STATUS target_if_wifi_pos_get_indirect_data(
 		target_if_err("incorrect pdev_id: %d", indirect->pdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
+
+	allocated_len = priv_obj->dma_cap[ring_idx].min_buf_size +
+				(priv_obj->dma_cap[ring_idx].min_buf_align - 1);
+	if (indirect->len > allocated_len ||
+	    indirect->len > OEM_DATA_DMA_BUFF_SIZE) {
+		target_if_err("Invalid indirect len: %d, allocated_len:%d",
+			      indirect->len, allocated_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	addr_hi = (uint64_t)WMI_OEM_DMA_DATA_ADDR_HI_GET(
 						indirect->addr_hi);
 	paddr = (void *)((uint64_t)addr_hi << 32 | indirect->addr_lo);
@@ -316,6 +327,9 @@ void target_if_wifi_pos_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 		target_if_wifi_pos_register_events;
 	wifi_pos_tx_ops->wifi_pos_deregister_events =
 		target_if_wifi_pos_deregister_events;
+	wifi_pos_tx_ops->wifi_pos_get_vht_ch_width =
+		target_if_wifi_pos_get_vht_ch_width;
+
 }
 
 inline struct wlan_lmac_if_wifi_pos_rx_ops *target_if_wifi_pos_get_rxops(
@@ -399,6 +413,33 @@ QDF_STATUS target_if_wifi_pos_deregister_events(struct wlan_objmgr_psoc *psoc)
 	wmi_unified_unregister_event_handler(
 			get_wmi_unified_hdl_from_psoc(psoc),
 			wmi_oem_report_event_id);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS target_if_wifi_pos_get_vht_ch_width(struct wlan_objmgr_psoc *psoc,
+					       enum phy_ch_width *ch_width)
+{
+	struct target_psoc_info *tgt_hdl;
+	int vht_cap_info;
+
+	*ch_width = CH_WIDTH_INVALID;
+
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl)
+		return QDF_STATUS_E_INVAL;
+
+	*ch_width = CH_WIDTH_80MHZ;
+
+	vht_cap_info = target_if_get_vht_cap_info(tgt_hdl);
+
+	if (vht_cap_info & WLAN_VHTCAP_SUP_CHAN_WIDTH_80_160)
+		*ch_width = CH_WIDTH_80P80MHZ;
+	else if (vht_cap_info & WLAN_VHTCAP_SUP_CHAN_WIDTH_160)
+		*ch_width = CH_WIDTH_160MHZ;
 
 	return QDF_STATUS_SUCCESS;
 }

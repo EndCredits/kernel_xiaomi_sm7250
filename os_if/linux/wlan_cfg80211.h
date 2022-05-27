@@ -46,6 +46,8 @@
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_OS_IF, params)
 #define osif_rl_debug(params...) \
 	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_OS_IF, params)
+#define osif_err_rl(params...) \
+	QDF_TRACE_ERROR_RL(QDF_MODULE_ID_OS_IF, params)
 
 #define osif_nofl_alert(params...) \
 	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_OS_IF, params)
@@ -57,6 +59,15 @@
 	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_OS_IF, params)
 #define osif_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_OS_IF, params)
+
+/* For kernel version >= 5.2, driver needs to provide policy */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0))
+#define vendor_command_policy(__policy, __maxattr) \
+	.policy = __policy,                        \
+	.maxattr = __maxattr
+#else
+#define vendor_command_policy(__policy, __maxattr)
+#endif /*End of (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0) */
 
 #if defined(NBUF_MEMORY_DEBUG) && defined(NETLINK_BUF_TRACK)
 #define wlan_cfg80211_vendor_free_skb(skb) \

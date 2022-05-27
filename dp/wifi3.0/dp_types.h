@@ -282,6 +282,42 @@ enum dp_cpu_ring_map_types {
 };
 
 /**
+ * enum dp_ctxt - context type
+ * @DP_PDEV_TYPE: PDEV context
+ * @DP_RX_RING_HIST_TYPE: Datapath rx ring history
+ * @DP_RX_ERR_RING_HIST_TYPE: Datapath rx error ring history
+ * @DP_RX_REINJECT_RING_HIST_TYPE: Datapath reinject ring history
+ */
+enum dp_ctxt_type {
+	DP_PDEV_TYPE,
+	DP_RX_RING_HIST_TYPE,
+	DP_RX_ERR_RING_HIST_TYPE,
+	DP_RX_REINJECT_RING_HIST_TYPE,
+};
+
+/**
+ * enum dp_desc_type - source type for multiple pages allocation
+ * @DP_TX_DESC_TYPE: DP SW TX descriptor
+ * @DP_TX_EXT_DESC_TYPE: DP TX msdu extension descriptor
+ * @DP_TX_EXT_DESC_LINK_TYPE: DP link descriptor for msdu ext_desc
+ * @DP_TX_TSO_DESC_TYPE: DP TX TSO descriptor
+ * @DP_TX_TSO_NUM_SEG_TYPE: DP TX number of segments
+ * @DP_RX_DESC_BUF_TYPE: DP RX SW descriptor
+ * @DP_RX_DESC_STATUS_TYPE: DP RX SW descriptor for monitor status
+ * @DP_HW_LINK_DESC_TYPE: DP HW link descriptor
+ */
+enum dp_desc_type {
+	DP_TX_DESC_TYPE,
+	DP_TX_EXT_DESC_TYPE,
+	DP_TX_EXT_DESC_LINK_TYPE,
+	DP_TX_TSO_DESC_TYPE,
+	DP_TX_TSO_NUM_SEG_TYPE,
+	DP_RX_DESC_BUF_TYPE,
+	DP_RX_DESC_STATUS_TYPE,
+	DP_HW_LINK_DESC_TYPE,
+};
+
+/**
  * struct rx_desc_pool
  * @pool_size: number of RX descriptor in the pool
  * @elem_size: Element size
@@ -292,6 +328,7 @@ enum dp_cpu_ring_map_types {
  * @owner: owner for nbuf
  * @buf_size: Buffer size
  * @buf_alignment: Buffer alignment
+ * @desc_type: type of desc this pool serves
  */
 struct rx_desc_pool {
 	uint32_t pool_size;
@@ -306,6 +343,7 @@ struct rx_desc_pool {
 	uint8_t owner;
 	uint16_t buf_size;
 	uint8_t buf_alignment;
+	enum dp_desc_type desc_type;
 };
 
 /**
@@ -494,18 +532,6 @@ struct dp_txrx_pool_stats {
 	uint16_t pool_unmap_count;
 	uint16_t pkt_drop_no_pool;
 };
-
-/* DP multiple pages allocation source */
-enum dp_desc_type {
-	DP_TX_DESC_TYPE,
-	DP_TX_EXT_DESC_TYPE,
-	DP_TX_EXT_DESC_LINK_TYPE,
-	DP_TX_TSO_DESC_TYPE,
-	DP_TX_TSO_NUM_SEG_TYPE,
-	DP_RX_DESC_BUF_TYPE,
-	DP_HW_LINK_DESC_TYPE,
-};
-
 
 struct dp_srng {
 	hal_ring_handle_t hal_srng;
@@ -764,6 +790,8 @@ struct dp_soc_stats {
 		uint32_t near_full;
 		/* Break ring reaping as not all scattered msdu received */
 		uint32_t msdu_scatter_wait_break;
+		/* Number of bar frames received */
+		uint32_t bar_frame;
 
 		struct {
 			/* Invalid RBM error count */
@@ -813,6 +841,8 @@ struct dp_soc_stats {
 			uint32_t scatter_msdu;
 			/* RX msdu drop count due to invalid cookie */
 			uint32_t invalid_cookie;
+			/* Count of stale cookie read in RX path */
+			uint32_t stale_cookie;
 			/* Delba sent count due to RX 2k jump */
 			uint32_t rx_2k_jump_delba_sent;
 			/* RX 2k jump msdu indicated to stack count */
@@ -837,6 +867,12 @@ struct dp_soc_stats {
 			uint32_t nbuf_sanity_fail;
 			/* Duplicate link desc refilled */
 			uint32_t dup_refill_link_desc;
+			/* EAPOL drop count in intrabss scenario */
+			uint32_t intrabss_eapol_drop;
+			/* Non Eapol pkt drop cnt due to peer not authorized */
+			uint32_t peer_unauth_rx_pkt_drop;
+			/* MSDU len err count */
+			uint32_t msdu_len_err;
 		} err;
 
 		/* packet count per core - per ring */
@@ -939,37 +975,60 @@ struct htt_t2h_stats {
 	uint32_t num_stats;
 };
 
+/*
+ * The logic for get current index of these history is dependent on this
+ * value being power of 2.
+ */
 #define DP_RX_HIST_MAX 2048
 #define DP_RX_ERR_HIST_MAX 4096
 #define DP_RX_REINJECT_HIST_MAX 1024
 
+QDF_COMPILE_TIME_ASSERT(rx_history_size,
+			(DP_RX_HIST_MAX &
+			 (DP_RX_HIST_MAX - 1)) == 0);
+QDF_COMPILE_TIME_ASSERT(rx_err_history_size,
+			(DP_RX_ERR_HIST_MAX &
+			 (DP_RX_ERR_HIST_MAX - 1)) == 0);
+QDF_COMPILE_TIME_ASSERT(rx_reinject_history_size,
+			(DP_RX_REINJECT_HIST_MAX &
+			 (DP_RX_REINJECT_HIST_MAX - 1)) == 0);
+
+/**
+ * struct dp_buf_info_record - ring buffer info
+ * @hbi: HW ring buffer info
+ * @timestamp: timestamp when this entry was recorded
+ */
 struct dp_buf_info_record {
 	struct hal_buf_info hbi;
 	uint64_t timestamp;
 };
 
+/* struct dp_rx_history - rx ring hisotry
+ * @index: Index where the last entry is written
+ * @entry: history entries
+ */
 struct dp_rx_history {
 	qdf_atomic_t index;
 	struct dp_buf_info_record entry[DP_RX_HIST_MAX];
 };
 
+/* struct dp_rx_err_history - rx err ring hisotry
+ * @index: Index where the last entry is written
+ * @entry: history entries
+ */
 struct dp_rx_err_history {
 	qdf_atomic_t index;
 	struct dp_buf_info_record entry[DP_RX_ERR_HIST_MAX];
 };
 
+/* struct dp_rx_reinject_history - rx reinject ring hisotry
+ * @index: Index where the last entry is written
+ * @entry: history entries
+ */
 struct dp_rx_reinject_history {
 	qdf_atomic_t index;
 	struct dp_buf_info_record entry[DP_RX_REINJECT_HIST_MAX];
 };
-
-static inline uint32_t dp_history_get_next_index(qdf_atomic_t *curr_idx,
-						 uint32_t max_entries)
-{
-	uint32_t idx = qdf_atomic_inc_return(curr_idx);
-
-	return idx & (max_entries - 1);
-}
 
 /* structure to record recent operation related variable */
 struct dp_last_op_info {
@@ -1127,6 +1186,10 @@ struct dp_soc {
 	/* Number of REO destination rings */
 	uint8_t num_reo_dest_rings;
 
+	struct dp_rx_history *rx_ring_history[MAX_REO_DEST_RINGS];
+	struct dp_rx_err_history *rx_err_ring_history;
+	struct dp_rx_reinject_history *rx_reinject_ring_history;
+
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 	/* lock to control access to soc TX descriptors */
 	qdf_spinlock_t flow_pool_array_lock;
@@ -1227,10 +1290,6 @@ struct dp_soc {
 		TAILQ_HEAD(, dp_ast_entry) * bins;
 	} ast_hash;
 
-	struct dp_rx_history *rx_ring_history[MAX_REO_DEST_RINGS];
-	struct dp_rx_err_history *rx_err_ring_history;
-	struct dp_rx_reinject_history *rx_reinject_ring_history;
-
 	qdf_spinlock_t ast_lock;
 	/*Timer for AST entry ageout maintainance */
 	qdf_timer_t ast_aging_timer;
@@ -1268,6 +1327,8 @@ struct dp_soc {
 		void *ipa_wbm_ring_base_vaddr;
 		uint32_t ipa_wbm_ring_size;
 		qdf_dma_addr_t ipa_wbm_tp_paddr;
+		/* WBM2SW HP shadow paddr */
+		qdf_dma_addr_t ipa_wbm_hp_shadow_paddr;
 
 		/* TX buffers populated into the WBM ring */
 		void **tx_buf_pool_vaddr_unaligned;
@@ -1355,6 +1416,10 @@ struct dp_soc {
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG || WLAN_SUPPORT_RX_FISA */
 	/* Save recent operation related variable */
 	struct dp_last_op_info last_op_info;
+#ifdef FEATURE_RUNTIME_PM
+	/* Dp runtime refcount */
+	qdf_atomic_t dp_runtime_refcount;
+#endif
 };
 
 #ifdef IPA_OFFLOAD
@@ -2426,6 +2491,7 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t last_hal_aggr_count;
 	uint32_t cur_aggr_gso_size;
 	struct udphdr *head_skb_udp_hdr;
+	uint32_t reo_dest_indication;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)

@@ -1210,6 +1210,24 @@ static inline uint32_t hal_rx_msdu_flow_idx_get_6490(uint8_t *buf)
 }
 
 /**
+ * hal_rx_msdu_get_reo_destination_indication_6490: API to get
+ * reo_destination_indication from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
+ * @reo_destination_indication: pointer to return value of reo_destination_indication
+ *
+ * Return: none
+ */
+static inline void
+hal_rx_msdu_get_reo_destination_indication_6490(uint8_t *buf,
+						uint32_t *reo_destination_indication)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_msdu_end *msdu_end = &pkt_tlvs->msdu_end_tlv.rx_msdu_end;
+
+	*reo_destination_indication = HAL_RX_MSDU_END_REO_DEST_IND_GET(msdu_end);
+}
+
+/**
  * hal_rx_msdu_flow_idx_invalid_6490: API to get flow index invalid
  * from rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
@@ -1430,8 +1448,17 @@ hal_reo_set_err_dst_remap_6490(void *hal_soc)
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 3) |
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 4) |
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_TCL, 5) |
-		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 6) |
+		HAL_REO_ERR_REMAP_IX0(REO_REMAP_TCL, 6) |
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_TCL, 7);
+
+	uint32_t dst_remap_ix1 =
+		HAL_REO_ERR_REMAP_IX1(REO_REMAP_RELEASE, 14) |
+		HAL_REO_ERR_REMAP_IX1(REO_REMAP_RELEASE, 13) |
+		HAL_REO_ERR_REMAP_IX1(REO_REMAP_RELEASE, 12) |
+		HAL_REO_ERR_REMAP_IX1(REO_REMAP_RELEASE, 11) |
+		HAL_REO_ERR_REMAP_IX1(REO_REMAP_RELEASE, 10) |
+		HAL_REO_ERR_REMAP_IX1(REO_REMAP_RELEASE, 9) |
+		HAL_REO_ERR_REMAP_IX1(REO_REMAP_TCL, 8);
 
 		HAL_REG_WRITE(hal_soc,
 			      HWIO_REO_R0_ERROR_DESTINATION_MAPPING_IX_0_ADDR(
@@ -1442,6 +1469,17 @@ hal_reo_set_err_dst_remap_6490(void *hal_soc)
 			 HAL_REG_READ(
 			 hal_soc,
 			 HWIO_REO_R0_ERROR_DESTINATION_MAPPING_IX_0_ADDR(
+			 SEQ_WCSS_UMAC_REO_REG_OFFSET)));
+
+		HAL_REG_WRITE(hal_soc,
+			      HWIO_REO_R0_ERROR_DESTINATION_MAPPING_IX_1_ADDR(
+			      SEQ_WCSS_UMAC_REO_REG_OFFSET),
+			      dst_remap_ix1);
+
+		hal_info("HWIO_REO_R0_ERROR_DESTINATION_MAPPING_IX_1 0x%x",
+			 HAL_REG_READ(
+			 hal_soc,
+			 HWIO_REO_R0_ERROR_DESTINATION_MAPPING_IX_1_ADDR(
 			 SEQ_WCSS_UMAC_REO_REG_OFFSET)));
 }
 
@@ -1550,6 +1588,7 @@ struct hal_hw_txrx_ops qca6490_hal_hw_txrx_ops = {
 	hal_rx_get_flow_agg_continuation_6490,
 	hal_rx_get_flow_agg_count_6490,
 	hal_rx_get_fisa_timeout_6490,
+	hal_rx_msdu_get_reo_destination_indication_6490
 };
 
 struct hal_hw_srng_config hw_srng_table_6490[] = {
@@ -1835,7 +1874,11 @@ struct hal_hw_srng_config hw_srng_table_6490[] = {
 	},
 	{ /* WBM2SW_RELEASE */
 		.start_ring_id = HAL_SRNG_WBM2SW0_RELEASE,
+#ifdef CONFIG_PLD_PCIE_FW_SIM
+		.max_rings = 5,
+#else
 		.max_rings = 4,
+#endif
 		.entry_size = sizeof(struct wbm_release_ring) >> 2,
 		.lmac_ring = FALSE,
 		.ring_dir = HAL_SRNG_DST_RING,

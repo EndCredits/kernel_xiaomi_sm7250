@@ -95,6 +95,10 @@ struct rssi_monitor_param {
  * @roam_bad_rssi_thresh_offset_2g: Offset from Bad RSSI threshold for 2G
  *                                  to 5G Roam
  * @bg_scan_client_bitmap: Bitmap used to identify the client scans to snoop
+ * @roam_data_rssi_threshold_triggers: triggers of bad data RSSI threshold to
+ *                                  roam
+ * @roam_data_rssi_threshold: Bad data RSSI threshold to roam
+ * @rx_data_inactivity_time: Rx duration to check data RSSI
  * @flags: Flags for Background Roaming
  *	Bit 0 : BG roaming enabled when we connect to 2G AP only and roaming
  *	        to 5G AP only.
@@ -125,6 +129,9 @@ struct roam_offload_scan_rssi_params {
 	int8_t bg_scan_bad_rssi_thresh;
 	uint8_t roam_bad_rssi_thresh_offset_2g;
 	uint32_t bg_scan_client_bitmap;
+	uint32_t roam_data_rssi_threshold_triggers;
+	int32_t roam_data_rssi_threshold;
+	uint32_t rx_data_inactivity_time;
 	uint32_t flags;
 };
 
@@ -436,8 +443,11 @@ struct scoring_param {
 #define IDLE_ROAM_TRIGGER 0
 #define BTM_ROAM_TRIGGER  1
 
+#define NUM_OF_ROAM_MIN_RSSI 3
+
 #define DEAUTH_MIN_RSSI 0
 #define BMISS_MIN_RSSI  1
+#define MIN_RSSI_2G_TO_5G_ROAM 2
 
 /**
  * enum roam_trigger_reason - Reason for triggering roam
@@ -524,7 +534,7 @@ struct ap_profile_params {
 	uint8_t vdev_id;
 	struct ap_profile profile;
 	struct scoring_param param;
-	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_MIN_RSSI];
 	struct roam_trigger_score_delta score_delta_param[NUM_OF_ROAM_TRIGGERS];
 };
 

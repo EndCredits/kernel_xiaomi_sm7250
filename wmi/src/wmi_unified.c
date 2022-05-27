@@ -1704,6 +1704,44 @@ static inline void wmi_unified_debug_dump(wmi_unified_t wmi_handle)
 						"WMI_NON_TLV_TARGET"));
 }
 
+#ifdef SYSTEM_PM_CHECK
+/**
+ * wmi_set_system_pm_pkt_tag() - API to set tag for system pm packets
+ * @htc_tag: HTC tag
+ * @buf: wmi cmd buffer
+ * @cmd_id: cmd id
+ *
+ * Return: None
+ */
+static void wmi_set_system_pm_pkt_tag(uint16_t *htc_tag, wmi_buf_t buf,
+				      uint32_t cmd_id)
+{
+	switch (cmd_id) {
+	case WMI_WOW_ENABLE_CMDID:
+	case WMI_PDEV_SUSPEND_CMDID:
+		*htc_tag = HTC_TX_PACKET_SYSTEM_SUSPEND;
+		break;
+	case WMI_WOW_HOSTWAKEUP_FROM_SLEEP_CMDID:
+	case WMI_PDEV_RESUME_CMDID:
+		*htc_tag = HTC_TX_PACKET_SYSTEM_RESUME;
+		break;
+	case WMI_D0_WOW_ENABLE_DISABLE_CMDID:
+		if (wmi_is_legacy_d0wow_disable_cmd(buf, cmd_id))
+			*htc_tag = HTC_TX_PACKET_SYSTEM_RESUME;
+		else
+			*htc_tag = HTC_TX_PACKET_SYSTEM_SUSPEND;
+		break;
+	default:
+		break;
+	}
+}
+#else
+static inline void wmi_set_system_pm_pkt_tag(uint16_t *htc_tag, wmi_buf_t buf,
+					     uint32_t cmd_id)
+{
+}
+#endif
+
 QDF_STATUS wmi_unified_cmd_send_fl(wmi_unified_t wmi_handle, wmi_buf_t buf,
 				   uint32_t len, uint32_t cmd_id,
 				   const char *func, uint32_t line)
@@ -1711,8 +1749,10 @@ QDF_STATUS wmi_unified_cmd_send_fl(wmi_unified_t wmi_handle, wmi_buf_t buf,
 	HTC_PACKET *pkt;
 	QDF_STATUS status;
 	uint16_t htc_tag = 0;
+	bool rtpm_inprogress;
 
-	if (wmi_get_runtime_pm_inprogress(wmi_handle)) {
+	rtpm_inprogress = wmi_get_runtime_pm_inprogress(wmi_handle);
+	if (rtpm_inprogress) {
 		htc_tag = wmi_handle->ops->wmi_set_htc_tx_tag(wmi_handle, buf,
 							      cmd_id);
 	} else if (qdf_atomic_read(&wmi_handle->is_target_suspended) &&
@@ -1773,6 +1813,9 @@ QDF_STATUS wmi_unified_cmd_send_fl(wmi_unified_t wmi_handle, wmi_buf_t buf,
 		qdf_atomic_dec(&wmi_handle->pending_cmds);
 		return QDF_STATUS_E_NOMEM;
 	}
+
+	if (!rtpm_inprogress)
+		wmi_set_system_pm_pkt_tag(&htc_tag, buf, cmd_id);
 
 	SET_HTC_PACKET_INFO_TX(pkt,
 			       NULL,
@@ -1932,8 +1975,7 @@ int wmi_unified_register_event_handler(wmi_unified_t wmi_handle,
 	evt_id = wmi_handle->wmi_events[event_id];
 
 	if (wmi_unified_get_event_handler_ix(wmi_handle, evt_id) != -1) {
-		WMI_LOGI("event handler already registered 0x%x",
-			 evt_id);
+		wmi_info("event handler already registered 0x%x", evt_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 	if (soc->max_event_idx == WMI_UNIFIED_MAX_EVENT) {
@@ -1980,7 +2022,7 @@ int wmi_unified_unregister_event(wmi_unified_t wmi_handle,
 
 	idx = wmi_unified_get_event_handler_ix(wmi_handle, evt_id);
 	if (idx == -1) {
-		WMI_LOGI("event handler is not registered: evt id 0x%x",
+		wmi_warn("event handler is not registered: evt id 0x%x",
 			 evt_id);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -2018,15 +2060,14 @@ int wmi_unified_unregister_event_handler(wmi_unified_t wmi_handle,
 
 	if (event_id >= wmi_events_max ||
 		wmi_handle->wmi_events[event_id] == WMI_EVENT_ID_INVALID) {
-		WMI_LOGI("Event id %d is unavailable",
-			 event_id);
+		wmi_err("Event id %d is unavailable", event_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 	evt_id = wmi_handle->wmi_events[event_id];
 
 	idx = wmi_unified_get_event_handler_ix(wmi_handle, evt_id);
 	if (idx == -1) {
-		WMI_LOGI("event handler is not registered: evt id 0x%x",
+		wmi_err("event handler is not registered: evt id 0x%x",
 			 evt_id);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -2310,7 +2351,7 @@ QDF_STATUS wmi_unified_cmd_send_over_qmi(struct wmi_unified *wmi_handle,
 
 	qdf_mem_zero(qdf_nbuf_data(buf), sizeof(WMI_CMD_HDR));
 	WMI_SET_FIELD(qdf_nbuf_data(buf), WMI_CMD_HDR, COMMANDID, cmd_id);
-	wmi_debug("Sending WMI_CMD_ID: %d over qmi", cmd_id);
+	wmi_debug("Sending WMI_CMD_ID: 0x%x over qmi", cmd_id);
 	status = qdf_wmi_send_recv_qmi(qdf_nbuf_data(buf),
 				       buflen + sizeof(WMI_CMD_HDR),
 				       wmi_handle,

@@ -1007,9 +1007,9 @@ hal_reo_set_err_dst_remap_6390(void *hal_soc)
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 3) |
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 4) |
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_TCL, 5) |
-		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 6) |
+		HAL_REO_ERR_REMAP_IX0(REO_REMAP_TCL, 6) |
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_TCL, 7) |
-		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 8) |
+		HAL_REO_ERR_REMAP_IX0(REO_REMAP_TCL, 8) |
 		HAL_REO_ERR_REMAP_IX0(REO_REMAP_RELEASE, 9);
 
 		HAL_REG_WRITE(hal_soc,
@@ -1122,6 +1122,7 @@ struct hal_hw_txrx_ops qca6390_hal_hw_txrx_ops = {
 	NULL,
 	NULL,
 	NULL,
+	NULL
 };
 
 struct hal_hw_srng_config hw_srng_table_6390[] = {

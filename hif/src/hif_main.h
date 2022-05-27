@@ -201,6 +201,10 @@ struct hif_softc {
 	atomic_t link_suspended;
 	uint32_t *vaddr_rri_on_ddr;
 	qdf_dma_addr_t paddr_rri_on_ddr;
+#ifdef CONFIG_BYPASS_QMI
+	uint32_t *vaddr_qmi_bypass;
+	qdf_dma_addr_t paddr_qmi_bypass;
+#endif
 	int linkstate_vote;
 	bool fastpath_mode_on;
 	atomic_t tasklet_from_intr;
@@ -247,6 +251,13 @@ struct hif_softc {
 #endif
 #ifdef HIF_CE_LOG_INFO
 	qdf_notif_block hif_recovery_notifier;
+#endif
+#ifdef FEATURE_RUNTIME_PM
+	/* Variable to track the link state change in RTPM */
+	qdf_atomic_t pm_link_state;
+#endif
+#ifdef SYSTEM_PM_CHECK
+	qdf_atomic_t sys_pm_state;
 #endif
 };
 
@@ -366,6 +377,47 @@ void hif_wlan_disable(struct hif_softc *scn);
 int hif_target_sleep_state_adjust(struct hif_softc *scn,
 					 bool sleep_ok,
 					 bool wait_for_it);
+
+#ifdef DP_MEM_PRE_ALLOC
+void *hif_mem_alloc_consistent_unaligned(struct hif_softc *scn,
+					 qdf_size_t size,
+					 qdf_dma_addr_t *paddr,
+					 uint32_t ring_type,
+					 uint8_t *is_mem_prealloc);
+
+void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
+				       qdf_size_t size,
+				       void *vaddr,
+				       qdf_dma_addr_t paddr,
+				       qdf_dma_context_t memctx,
+				       uint8_t is_mem_prealloc);
+#else
+static inline
+void *hif_mem_alloc_consistent_unaligned(struct hif_softc *scn,
+					 qdf_size_t size,
+					 qdf_dma_addr_t *paddr,
+					 uint32_t ring_type,
+					 uint8_t *is_mem_prealloc)
+{
+	return qdf_mem_alloc_consistent(scn->qdf_dev,
+					scn->qdf_dev->dev,
+					size,
+					paddr);
+}
+
+static inline
+void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
+				       qdf_size_t size,
+				       void *vaddr,
+				       qdf_dma_addr_t paddr,
+				       qdf_dma_context_t memctx,
+				       uint8_t is_mem_prealloc)
+{
+	return qdf_mem_free_consistent(scn->qdf_dev, scn->qdf_dev->dev,
+				       size, vaddr, paddr, memctx);
+}
+#endif
+
 /**
  * hif_get_rx_ctx_id() - Returns NAPI instance ID based on CE ID
  * @ctx_id: Rx CE context ID
@@ -408,4 +460,5 @@ void hif_uninit_rri_on_ddr(struct hif_softc *scn);
 static inline
 void hif_uninit_rri_on_ddr(struct hif_softc *scn) {}
 #endif
+void hif_cleanup_static_buf_to_target(struct hif_softc *scn);
 #endif /* __HIF_MAIN_H__ */

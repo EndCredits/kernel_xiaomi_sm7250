@@ -112,6 +112,7 @@ void hif_record_ce_srng_desc_event(struct hif_softc *scn, int ce_id,
 
 	event->type = type;
 	event->time = qdf_get_log_timestamp();
+	event->cpu_id = qdf_get_cpu();
 
 	if (descriptor)
 		qdf_mem_copy(&event->descriptor, descriptor,
@@ -945,10 +946,10 @@ static void ce_prepare_shadow_register_v2_cfg_srng(struct hif_softc *scn,
 		/* return with original configuration*/
 		return;
 	}
-
-	hal_construct_shadow_config(scn->hal_soc);
+	hal_construct_srng_shadow_regs(scn->hal_soc);
 	ce_construct_shadow_config_srng(scn);
-
+	hal_set_shadow_regs(scn->hal_soc);
+	hal_construct_shadow_regs(scn->hal_soc);
 	/* get updated configuration */
 	hal_get_shadow_config(scn->hal_soc, shadow_config,
 			      num_shadow_registers_configured);

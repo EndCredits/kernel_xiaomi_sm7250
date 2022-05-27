@@ -155,6 +155,79 @@ static void hal_update_srng_hp_tp_address(struct hal_soc *hal_soc,
 
 }
 
+#ifdef GENERIC_SHADOW_REGISTER_ACCESS_ENABLE
+void hal_set_one_target_reg_config(struct hal_soc *hal,
+				   uint32_t target_reg_offset,
+				   int list_index)
+{
+	int i = list_index;
+
+	qdf_assert_always(i < MAX_GENERIC_SHADOW_REG);
+	hal->list_shadow_reg_config[i].target_register =
+		target_reg_offset;
+	hal->num_generic_shadow_regs_configured++;
+}
+
+qdf_export_symbol(hal_set_one_target_reg_config);
+
+#define REO_R0_DESTINATION_RING_CTRL_ADDR_OFFSET 0x4
+#define MAX_REO_REMAP_SHADOW_REGS 4
+QDF_STATUS hal_set_shadow_regs(void *hal_soc)
+{
+	uint32_t target_reg_offset;
+	struct hal_soc *hal = (struct hal_soc *)hal_soc;
+	int i;
+	struct hal_hw_srng_config *srng_config =
+		&hal->hw_srng_table[WBM2SW_RELEASE];
+
+	target_reg_offset =
+		HWIO_REO_R0_DESTINATION_RING_CTRL_IX_0_ADDR(
+			SEQ_WCSS_UMAC_REO_REG_OFFSET);
+
+	for (i = 0; i < MAX_REO_REMAP_SHADOW_REGS; i++) {
+		hal_set_one_target_reg_config(hal, target_reg_offset, i);
+		target_reg_offset += REO_R0_DESTINATION_RING_CTRL_ADDR_OFFSET;
+	}
+
+	target_reg_offset = srng_config->reg_start[HP_OFFSET_IN_REG_START];
+	target_reg_offset += (srng_config->reg_size[HP_OFFSET_IN_REG_START]
+			      * HAL_IPA_TX_COMP_RING_IDX);
+
+	hal_set_one_target_reg_config(hal, target_reg_offset, i);
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(hal_set_shadow_regs);
+
+QDF_STATUS hal_construct_shadow_regs(void *hal_soc)
+{
+	struct hal_soc *hal = (struct hal_soc *)hal_soc;
+	int shadow_config_index = hal->num_shadow_registers_configured;
+	int i;
+	int num_regs = hal->num_generic_shadow_regs_configured;
+
+	for (i = 0; i < num_regs; i++) {
+		qdf_assert_always(shadow_config_index < MAX_SHADOW_REGISTERS);
+		hal->shadow_config[shadow_config_index].addr =
+			hal->list_shadow_reg_config[i].target_register;
+		hal->list_shadow_reg_config[i].shadow_config_index =
+			shadow_config_index;
+		hal->list_shadow_reg_config[i].va =
+			SHADOW_REGISTER(shadow_config_index) +
+			(uintptr_t)hal->dev_base_addr;
+		hal_debug("target_reg %x, shadow register 0x%x shadow_index 0x%x",
+			  hal->shadow_config[shadow_config_index].addr,
+			  SHADOW_REGISTER(shadow_config_index),
+			  shadow_config_index);
+		shadow_config_index++;
+		hal->num_shadow_registers_configured++;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(hal_construct_shadow_regs);
+#endif
+
 QDF_STATUS hal_set_one_shadow_config(void *hal_soc,
 				     int ring_type,
 				     int ring_num)
@@ -196,7 +269,7 @@ QDF_STATUS hal_set_one_shadow_config(void *hal_soc,
 
 qdf_export_symbol(hal_set_one_shadow_config);
 
-QDF_STATUS hal_construct_shadow_config(void *hal_soc)
+QDF_STATUS hal_construct_srng_shadow_regs(void *hal_soc)
 {
 	int ring_type, ring_num;
 	struct hal_soc *hal = (struct hal_soc *)hal_soc;
@@ -221,7 +294,7 @@ QDF_STATUS hal_construct_shadow_config(void *hal_soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-qdf_export_symbol(hal_construct_shadow_config);
+qdf_export_symbol(hal_construct_srng_shadow_regs);
 
 void hal_get_shadow_config(void *hal_soc,
 	struct pld_shadow_reg_v2_cfg **shadow_config,
@@ -237,9 +310,9 @@ void hal_get_shadow_config(void *hal_soc,
 qdf_export_symbol(hal_get_shadow_config);
 
 
-static void hal_validate_shadow_register(struct hal_soc *hal,
-				  uint32_t *destination,
-				  uint32_t *shadow_address)
+static bool hal_validate_shadow_register(struct hal_soc *hal,
+					 uint32_t *destination,
+					 uint32_t *shadow_address)
 {
 	unsigned int index;
 	uint32_t *shadow_0_offset = SHADOW_REGISTER(0) + hal->dev_base_addr;
@@ -259,13 +332,13 @@ static void hal_validate_shadow_register(struct hal_soc *hal,
 			hal->shadow_config[index].addr);
 		goto error;
 	}
-	return;
+	return true;
 error:
 	qdf_print("%s: baddr %pK, desination %pK, shadow_address %pK s0offset %pK index %x",
 		  __func__, hal->dev_base_addr, destination, shadow_address,
 		  shadow_0_offset, index);
 	QDF_BUG(0);
-	return;
+	return false;
 }
 
 static void hal_target_based_configure(struct hal_soc *hal)
@@ -405,6 +478,7 @@ hal_process_reg_write_q_elem(struct hal_soc *hal,
 	}
 
 	q_elem->valid = 0;
+	srng->last_dequeue_time = q_elem->dequeue_time;
 	SRNG_UNLOCK(&srng->lock);
 
 	return write_val;
@@ -433,6 +507,64 @@ static inline void hal_reg_write_fill_sched_delay_hist(struct hal_soc *hal,
 	else
 		hist[REG_WRITE_SCHED_DELAY_GT_5000us]++;
 }
+
+#ifdef SHADOW_WRITE_DELAY
+
+#define SHADOW_WRITE_MIN_DELTA_US	5
+#define SHADOW_WRITE_DELAY_US		50
+
+/*
+ * Never add those srngs which are performance relate.
+ * The delay itself will hit performance heavily.
+ */
+#define IS_SRNG_MATCH(s)	((s)->ring_id == HAL_SRNG_CE_1_DST_STATUS || \
+				 (s)->ring_id == HAL_SRNG_CE_1_DST)
+
+static inline bool hal_reg_write_need_delay(struct hal_reg_write_q_elem *elem)
+{
+	struct hal_srng *srng = elem->srng;
+	struct hal_soc *hal;
+	qdf_time_t now;
+	qdf_iomem_t real_addr;
+
+	if (qdf_unlikely(!srng))
+		return false;
+
+	hal = srng->hal_soc;
+	if (qdf_unlikely(!hal))
+		return false;
+
+	/* Check if it is target srng, and valid shadow reg */
+	if (qdf_likely(!IS_SRNG_MATCH(srng)))
+		return false;
+
+	if (srng->ring_dir == HAL_SRNG_SRC_RING)
+		real_addr = SRNG_SRC_ADDR(srng, HP);
+	else
+		real_addr = SRNG_DST_ADDR(srng, TP);
+	if (!hal_validate_shadow_register(hal, real_addr, elem->addr))
+		return false;
+
+	/* Check the time delta from last write of same srng */
+	now = qdf_get_log_timestamp();
+	if (qdf_log_timestamp_to_usecs(now - srng->last_dequeue_time) >
+		SHADOW_WRITE_MIN_DELTA_US)
+		return false;
+
+	/* Delay dequeue, and record */
+	qdf_udelay(SHADOW_WRITE_DELAY_US);
+
+	srng->wstats.dequeue_delay++;
+	hal->stats.wstats.dequeue_delay++;
+
+	return true;
+}
+#else
+static inline bool hal_reg_write_need_delay(struct hal_reg_write_q_elem *elem)
+{
+	return false;
+}
+#endif
 
 /**
  * hal_reg_write_work() - Worker to process delayed writes
@@ -481,6 +613,10 @@ static void hal_reg_write_work(void *arg)
 		hal->stats.wstats.dequeues++;
 		qdf_atomic_dec(&hal->stats.wstats.q_depth);
 
+		if (hal_reg_write_need_delay(q_elem))
+			hal_verbose_debug("Delay reg writer for srng 0x%x, addr 0x%pK",
+					  q_elem->srng->ring_id, q_elem->addr);
+
 		write_val = hal_process_reg_write_q_elem(hal, q_elem);
 		hal_verbose_debug("read_idx %u srng 0x%x, addr 0x%pK dequeue_val %u sched delay %llu us",
 				  hal->read_idx, ring_id, addr, write_val, delta_us);
@@ -527,7 +663,7 @@ static void hal_reg_write_enqueue(struct hal_soc *hal_soc,
 	uint32_t write_idx;
 
 	if (srng->reg_write_in_progress) {
-		hal_verbose_debug("Already in progress srng ring id 0x%x addr 0x%x val %u",
+		hal_verbose_debug("Already in progress srng ring id 0x%x addr 0x%pK val %u",
 				  srng->ring_id, addr, value);
 		qdf_atomic_inc(&hal_soc->stats.wstats.coalesces);
 		srng->wstats.coalesces++;
@@ -579,7 +715,7 @@ static void hal_reg_write_enqueue(struct hal_soc *hal_soc,
 	srng->reg_write_in_progress  = true;
 	qdf_atomic_inc(&hal_soc->active_work_cnt);
 
-	hal_verbose_debug("write_idx %u srng ring id 0x%x addr 0x%x val %u",
+	hal_verbose_debug("write_idx %u srng ring id 0x%x addr 0x%pK val %u",
 			  write_idx, srng->ring_id, addr, value);
 
 	qdf_queue_work(hal_soc->qdf_dev, hal_soc->reg_write_wq,
@@ -942,59 +1078,69 @@ void hal_reo_read_write_ctrl_ix(hal_soc_handle_t hal_soc_hdl, bool read,
 			reg_offset =
 				HWIO_REO_R0_DESTINATION_RING_CTRL_IX_0_ADDR(
 						SEQ_WCSS_UMAC_REO_REG_OFFSET);
-			HAL_REG_WRITE_CONFIRM(hal, reg_offset, *ix0);
+			HAL_REG_WRITE_CONFIRM_RETRY(hal, reg_offset,
+						    *ix0, true);
 		}
 
 		if (ix1) {
 			reg_offset =
 				HWIO_REO_R0_DESTINATION_RING_CTRL_IX_1_ADDR(
 						SEQ_WCSS_UMAC_REO_REG_OFFSET);
-			HAL_REG_WRITE(hal, reg_offset, *ix1);
+			HAL_REG_WRITE_CONFIRM_RETRY(hal, reg_offset,
+						    *ix1, true);
 		}
 
 		if (ix2) {
 			reg_offset =
 				HWIO_REO_R0_DESTINATION_RING_CTRL_IX_2_ADDR(
 						SEQ_WCSS_UMAC_REO_REG_OFFSET);
-			HAL_REG_WRITE_CONFIRM(hal, reg_offset, *ix2);
+			HAL_REG_WRITE_CONFIRM_RETRY(hal, reg_offset,
+						    *ix2, true);
 		}
 
 		if (ix3) {
 			reg_offset =
 				HWIO_REO_R0_DESTINATION_RING_CTRL_IX_3_ADDR(
 						SEQ_WCSS_UMAC_REO_REG_OFFSET);
-			HAL_REG_WRITE_CONFIRM(hal, reg_offset, *ix3);
+			HAL_REG_WRITE_CONFIRM_RETRY(hal, reg_offset,
+						    *ix3, true);
 		}
 	}
 }
 
 /**
- * hal_srng_dst_set_hp_paddr() - Set physical address to dest ring head pointer
+ * hal_srng_dst_set_hp_paddr_confirm() - Set physical address to dest ring head
+ *  pointer and confirm that write went through by reading back the value
  * @srng: sring pointer
  * @paddr: physical address
  */
-void hal_srng_dst_set_hp_paddr(struct hal_srng *srng,
-			       uint64_t paddr)
+void hal_srng_dst_set_hp_paddr_confirm(struct hal_srng *srng, uint64_t paddr)
 {
-	SRNG_DST_REG_WRITE(srng, HP_ADDR_LSB,
-			   paddr & 0xffffffff);
-	SRNG_DST_REG_WRITE(srng, HP_ADDR_MSB,
-			   paddr >> 32);
+	SRNG_DST_REG_WRITE_CONFIRM(srng, HP_ADDR_LSB, paddr & 0xffffffff);
+	SRNG_DST_REG_WRITE_CONFIRM(srng, HP_ADDR_MSB, paddr >> 32);
 }
 
 /**
- * hal_srng_dst_init_hp() - Initilaize destination ring head pointer
+ * hal_srng_dst_init_hp() - Initialize destination ring head
+ * pointer
+ * @hal_soc: hal_soc handle
  * @srng: sring pointer
  * @vaddr: virtual address
  */
-void hal_srng_dst_init_hp(struct hal_srng *srng,
+void hal_srng_dst_init_hp(struct hal_soc_handle *hal_soc,
+			  struct hal_srng *srng,
 			  uint32_t *vaddr)
 {
+	uint32_t reg_offset;
+	struct hal_soc *hal = (struct hal_soc *)hal_soc;
+
 	if (!srng)
 		return;
 
 	srng->u.dst_ring.hp_addr = vaddr;
-	SRNG_DST_REG_WRITE_CONFIRM(srng, HP, srng->u.dst_ring.cached_hp);
+	reg_offset = SRNG_DST_ADDR(srng, HP) - hal->dev_base_addr;
+	HAL_REG_WRITE_CONFIRM_RETRY(
+		hal, reg_offset, srng->u.dst_ring.cached_hp, true);
 
 	if (vaddr) {
 		*srng->u.dst_ring.hp_addr = srng->u.dst_ring.cached_hp;

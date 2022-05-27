@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -626,12 +626,15 @@ struct wlan_lmac_if_sptrl_tx_ops {
  * @data_req_tx: function pointer to send wifi_pos req to firmware
  * @wifi_pos_register_events: function pointer to register wifi_pos events
  * @wifi_pos_deregister_events: function pointer to deregister wifi_pos events
+ * @wifi_pos_get_vht_ch_width: Function pointer to get max supported bw by FW
  */
 struct wlan_lmac_if_wifi_pos_tx_ops {
 	QDF_STATUS (*data_req_tx)(struct wlan_objmgr_pdev *pdev,
 				  struct oem_data_req *req);
 	QDF_STATUS (*wifi_pos_register_events)(struct wlan_objmgr_psoc *psoc);
 	QDF_STATUS (*wifi_pos_deregister_events)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*wifi_pos_get_vht_ch_width)(struct wlan_objmgr_psoc *psoc,
+						enum phy_ch_width *ch_width);
 };
 #endif
 
@@ -934,6 +937,23 @@ struct wlan_lmac_if_coex_tx_ops {
 };
 #endif
 
+#ifdef WLAN_FEATURE_GPIO_CFG
+struct gpio_config_params;
+struct gpio_output_params;
+
+/**
+ * struct wlan_lmac_if_gpio_tx_ops - south bound tx function pointers for gpio
+ * @set_gpio_config: function pointert to send gpio config to fw
+ * @set_gpio_output: function pointert to send gpio output to fw
+ */
+struct wlan_lmac_if_gpio_tx_ops {
+	QDF_STATUS (*set_gpio_config)(struct wlan_objmgr_psoc *psoc,
+				      struct gpio_config_params *param);
+	QDF_STATUS (*set_gpio_output)(struct wlan_objmgr_psoc *psoc,
+				      struct gpio_output_params *param);
+};
+#endif
+
 /**
  * struct wlan_lmac_if_tx_ops - south bound tx function pointers
  * @mgmt_txrx_tx_ops: mgmt txrx tx ops
@@ -942,6 +962,7 @@ struct wlan_lmac_if_coex_tx_ops {
  * @green_ap_tx_ops: green_ap tx_ops
  * @cp_stats_tx_ops: cp stats tx_ops
  * @coex_ops: coex tx_ops
+ * @gpio_ops: gpio tx_ops
  *
  * Callback function tabled to be registered with umac.
  * umac will use the functional table to send events/frames to wmi
@@ -1016,6 +1037,10 @@ struct wlan_lmac_if_tx_ops {
 
 #ifdef FEATURE_COEX
 	struct wlan_lmac_if_coex_tx_ops coex_ops;
+#endif
+
+#ifdef WLAN_FEATURE_GPIO_CFG
+	struct wlan_lmac_if_gpio_tx_ops gpio_ops;
 #endif
 };
 

@@ -146,12 +146,14 @@ enum hal_rx_msdu_desc_flags {
  *                      [2] AMPDU flag
  *			[3] raw_ampdu
  * @peer_meta_data:	Upper bits containing peer id, vdev id
+ * @bar_frame: indicates if received frame is a bar frame
  */
 struct hal_rx_mpdu_desc_info {
 	uint16_t msdu_count;
 	uint16_t mpdu_seq; /* 12 bits for length */
 	uint32_t mpdu_flags;
 	uint32_t peer_meta_data; /* sw progamed meta-data:MAC Id & peer Id */
+	uint16_t bar_frame;
 };
 
 /**
@@ -387,6 +389,11 @@ enum hal_rx_ret_buf_manager {
 	HAL_RX_MPDU_AMPDU_FLAG_GET(mpdu_info_ptr) |	\
 	HAL_RX_MPDU_RAW_MPDU_GET(mpdu_info_ptr))
 
+#define HAL_RX_MPDU_BAR_FRAME_GET(mpdu_info_ptr) \
+	((mpdu_info_ptr[RX_MPDU_DESC_INFO_0_BAR_FRAME_OFFSET >> 2] & \
+	RX_MPDU_DESC_INFO_0_BAR_FRAME_MASK) >> \
+	RX_MPDU_DESC_INFO_0_BAR_FRAME_LSB)
+
 
 #define HAL_RX_MSDU_PKT_LENGTH_GET(msdu_info_ptr)		\
 	(_HAL_MS((*_OFFSET_TO_WORD_PTR(msdu_info_ptr,		\
@@ -464,6 +471,10 @@ enum hal_rx_ret_buf_manager {
 		RX_MSDU_DESC_INFO_0_DA_IDX_TIMEOUT_OFFSET)) &	\
 		RX_MSDU_DESC_INFO_0_DA_IDX_TIMEOUT_MASK)
 
+#define HAL_RX_REO_MSDU_REO_DST_IND_GET(reo_desc)	\
+	(HAL_RX_MSDU_REO_DST_IND_GET(&		\
+	(((struct reo_destination_ring *)	\
+	   reo_desc)->rx_msdu_desc_info_details)))
 
 #define HAL_RX_MSDU_FLAGS_GET(msdu_info_ptr) \
 	(HAL_RX_FIRST_MSDU_IN_MPDU_FLAG_GET(msdu_info_ptr) | \
@@ -514,6 +525,7 @@ static inline void hal_rx_mpdu_desc_info_get(void *desc_addr,
 	mpdu_desc_info->mpdu_flags = HAL_RX_MPDU_FLAGS_GET(mpdu_info);
 	mpdu_desc_info->peer_meta_data =
 		HAL_RX_MPDU_DESC_PEER_META_DATA_GET(mpdu_info);
+	mpdu_desc_info->bar_frame = HAL_RX_MPDU_BAR_FRAME_GET(mpdu_info);
 }
 
 /*
@@ -3278,6 +3290,32 @@ hal_rx_msdu_flow_idx_get(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
+ * hal_rx_msdu_get_reo_destination_indication: API to get reo
+ * destination index from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
+ * @reo_destination_indication: pointer to return value of
+ * reo_destination_indication
+ *
+ * Return: reo_destination_indication value from MSDU END TLV
+ */
+static inline void
+hal_rx_msdu_get_reo_destination_indication(hal_soc_handle_t hal_soc_hdl,
+					   uint8_t *buf,
+					   uint32_t *reo_destination_indication)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if ((!hal_soc) || (!hal_soc->ops)) {
+		hal_err("hal handle is NULL");
+		QDF_BUG(0);
+		return;
+	}
+
+	hal_soc->ops->hal_rx_msdu_get_reo_destination_indication(buf,
+						reo_destination_indication);
+}
+
+/**
  * hal_rx_msdu_flow_idx_timeout: API to get flow index timeout
  * from rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
@@ -3743,5 +3781,27 @@ bool hal_rx_is_buf_addr_info_valid(
 {
 	return (HAL_RX_BUFFER_ADDR_31_0_GET(buf_addr_info) == 0) ?
 						false : true;
+}
+
+#define HAL_RX_ATTN_MSDU_LEN_ERR_GET(_rx_attn)		\
+	(_HAL_MS((*_OFFSET_TO_WORD_PTR(_rx_attn,	\
+		RX_ATTENTION_1_MSDU_LENGTH_ERR_OFFSET)),	\
+		RX_ATTENTION_1_MSDU_LENGTH_ERR_MASK,		\
+		RX_ATTENTION_1_MSDU_LENGTH_ERR_LSB))
+
+/**
+ * hal_rx_attn_msdu_len_err_get(): Get msdu_len_err value from
+ *  rx attention tlvs
+ * @buf: pointer to rx pkt tlvs hdr
+ *
+ * Return: msdu_len_err value
+ */
+static inline uint32_t
+hal_rx_attn_msdu_len_err_get(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_attention *rx_attn = &pkt_tlvs->attn_tlv.rx_attn;
+
+	return HAL_RX_ATTN_MSDU_LEN_ERR_GET(rx_attn);
 }
 #endif /* _HAL_RX_H */
