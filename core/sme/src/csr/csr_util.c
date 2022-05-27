@@ -645,6 +645,66 @@ bool csr_is_conn_state_wds(struct mac_context *mac, uint32_t sessionId)
 	       csr_is_conn_state_disconnected_wds(mac, sessionId);
 }
 
+enum csr_cfgdot11mode
+csr_get_vdev_dot11_mode(struct mac_context *mac,
+			enum QDF_OPMODE device_mode,
+			enum csr_cfgdot11mode curr_dot11_mode)
+{
+	enum mlme_vdev_dot11_mode vdev_dot11_mode;
+	uint8_t dot11_mode_indx;
+	enum csr_cfgdot11mode dot11_mode = curr_dot11_mode;
+	uint32_t vdev_type_dot11_mode =
+				mac->mlme_cfg->dot11_mode.vdev_type_dot11_mode;
+
+	sme_debug("curr_dot11_mode %d, vdev_dot11 %08X, dev_mode %d",
+		  curr_dot11_mode, vdev_type_dot11_mode, device_mode);
+
+	switch (device_mode) {
+	case QDF_STA_MODE:
+		dot11_mode_indx = STA_DOT11_MODE_INDX;
+		break;
+	case QDF_P2P_CLIENT_MODE:
+	case QDF_P2P_DEVICE_MODE:
+		dot11_mode_indx = P2P_DEV_DOT11_MODE_INDX;
+		break;
+	case QDF_TDLS_MODE:
+		dot11_mode_indx = TDLS_DOT11_MODE_INDX;
+		break;
+	case QDF_NAN_DISC_MODE:
+		dot11_mode_indx = NAN_DISC_DOT11_MODE_INDX;
+		break;
+	case QDF_NDI_MODE:
+		dot11_mode_indx = NDI_DOT11_MODE_INDX;
+		break;
+	case QDF_OCB_MODE:
+		dot11_mode_indx = OCB_DOT11_MODE_INDX;
+		break;
+	default:
+		return dot11_mode;
+	}
+	vdev_dot11_mode = CSR_GET_BITS(vdev_type_dot11_mode,
+				       dot11_mode_indx, 4);
+	if (vdev_dot11_mode == MLME_VDEV_DOT11_MODE_AUTO)
+		dot11_mode = curr_dot11_mode;
+
+	if (CSR_IS_DOT11_MODE_11N(curr_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11N)
+		dot11_mode = eCSR_CFG_DOT11_MODE_11N;
+
+	if (CSR_IS_DOT11_MODE_11AC(curr_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11AC)
+		dot11_mode = eCSR_CFG_DOT11_MODE_11AC;
+
+	if (CSR_IS_DOT11_MODE_11AX(curr_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11AX)
+		dot11_mode = eCSR_CFG_DOT11_MODE_11AX;
+
+	sme_debug("INI vdev_dot11_mode %d new dot11_mode %d",
+		  vdev_dot11_mode, dot11_mode);
+
+	return dot11_mode;
+}
+
 static bool csr_is_conn_state_ap(struct mac_context *mac, uint32_t sessionId)
 {
 	struct csr_roam_session *pSession;
@@ -1897,6 +1957,11 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 	uint32_t bitMask, loopCount;
 	uint32_t bss_chan_freq;
 
+	if (!pProfile) {
+		sme_err("profile not found");
+		return fMatch;
+	}
+
 	if (!QDF_IS_STATUS_SUCCESS(csr_get_phy_mode_from_bss(mac, pSirBssDesc,
 					&phyModeInBssDesc, pIes)))
 		return fMatch;
@@ -1955,31 +2020,32 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 			}
 		}
 	}
+
+	cfgDot11ModeToUse = csr_get_vdev_dot11_mode(mac, pProfile->csrPersona,
+						    cfgDot11ModeToUse);
 	if (fMatch && pReturnCfgDot11Mode) {
-		if (pProfile) {
-			/*
-			 * IEEE 11n spec (8.4.3): HT STA shall
-			 * eliminate TKIP as a choice for the pairwise
-			 * cipher suite if CCMP is advertised by the AP
-			 * or if the AP included an HT capabilities
-			 * element in its Beacons and Probe Response.
-			 */
-			if ((!CSR_IS_11n_ALLOWED(
-					pProfile->negotiatedUCEncryptionType))
-					&& ((eCSR_CFG_DOT11_MODE_11N ==
-						cfgDot11ModeToUse) ||
-					(eCSR_CFG_DOT11_MODE_11AC ==
-						cfgDot11ModeToUse) ||
-					(eCSR_CFG_DOT11_MODE_11AX ==
-						cfgDot11ModeToUse))) {
-				/* We cannot do 11n here */
-				if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_chan_freq)) {
-					cfgDot11ModeToUse =
-						eCSR_CFG_DOT11_MODE_11G;
-				} else {
-					cfgDot11ModeToUse =
-						eCSR_CFG_DOT11_MODE_11A;
-				}
+		/*
+		 * IEEE 11n spec (8.4.3): HT STA shall
+		 * eliminate TKIP as a choice for the pairwise
+		 * cipher suite if CCMP is advertised by the AP
+		 * or if the AP included an HT capabilities
+		 * element in its Beacons and Probe Response.
+		 */
+		if ((!CSR_IS_11n_ALLOWED(
+				pProfile->negotiatedUCEncryptionType))
+				&& ((eCSR_CFG_DOT11_MODE_11N ==
+					cfgDot11ModeToUse) ||
+				(eCSR_CFG_DOT11_MODE_11AC ==
+					cfgDot11ModeToUse) ||
+				(eCSR_CFG_DOT11_MODE_11AX ==
+					cfgDot11ModeToUse))) {
+			/* We cannot do 11n here */
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_chan_freq)) {
+				cfgDot11ModeToUse =
+					eCSR_CFG_DOT11_MODE_11G;
+			} else {
+				cfgDot11ModeToUse =
+					eCSR_CFG_DOT11_MODE_11A;
 			}
 		}
 		*pReturnCfgDot11Mode = cfgDot11ModeToUse;

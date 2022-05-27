@@ -187,7 +187,7 @@ QDF_STATUS wlan_mlme_set_ht_mpdu_density(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS wlan_mlme_get_band_capability(struct wlan_objmgr_psoc *psoc,
-					 uint8_t *band_capability)
+					 uint32_t *band_capability)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -201,7 +201,7 @@ QDF_STATUS wlan_mlme_get_band_capability(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS wlan_mlme_set_band_capability(struct wlan_objmgr_psoc *psoc,
-					 uint8_t band_capability)
+					 uint32_t band_capability)
 
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -1672,6 +1672,20 @@ QDF_STATUS wlan_mlme_set_assoc_sta_limit(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_mlme_get_assoc_sta_limit(struct wlan_objmgr_psoc *psoc,
+					 int *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.sap_cfg.assoc_sta_limit;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_set_rmc_action_period_freq(struct wlan_objmgr_psoc *psoc,
 						int value)
 {
@@ -2972,6 +2986,59 @@ wlan_mlme_get_vht20_mcs9(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS
+wlan_mlme_get_indoor_support_for_nan(struct wlan_objmgr_psoc *psoc,
+				     bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = false;
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.enable_nan_on_indoor_channels;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_srd_master_mode_for_vdev(struct wlan_objmgr_psoc *psoc,
+				       enum QDF_OPMODE vdev_opmode,
+				       bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = false;
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (vdev_opmode) {
+	case QDF_SAP_MODE:
+		*value = mlme_obj->cfg.reg.etsi_srd_chan_in_master_mode &
+			 MLME_SRD_MASTER_MODE_SAP;
+		break;
+	case QDF_P2P_GO_MODE:
+		*value = mlme_obj->cfg.reg.etsi_srd_chan_in_master_mode &
+			 MLME_SRD_MASTER_MODE_P2P_GO;
+		break;
+	case QDF_NAN_DISC_MODE:
+		*value = mlme_obj->cfg.reg.etsi_srd_chan_in_master_mode &
+			 MLME_SRD_MASTER_MODE_NAN;
+		break;
+	default:
+		mlme_legacy_err("Unexpected opmode %d", vdev_opmode);
+		*value = false;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -3867,6 +3934,7 @@ bool wlan_mlme_get_peer_unmap_conf(struct wlan_objmgr_psoc *psoc)
 #define AUTH_INDEX 0
 #define MAX_RETRIES 2
 #define MAX_ROAM_AUTH_RETRIES 1
+#define MAX_AUTH_RETRIES 3
 
 QDF_STATUS
 wlan_mlme_get_sae_assoc_retry_count(struct wlan_objmgr_psoc *psoc,
@@ -3907,7 +3975,7 @@ wlan_mlme_get_sae_auth_retry_count(struct wlan_objmgr_psoc *psoc,
 		WLAN_GET_BITS(mlme_obj->cfg.gen.sae_connect_retries,
 			      AUTH_INDEX * NUM_RETRY_BITS, NUM_RETRY_BITS);
 
-	*retry_count = QDF_MIN(MAX_RETRIES, *retry_count);
+	*retry_count = QDF_MIN(MAX_AUTH_RETRIES, *retry_count);
 
 	return QDF_STATUS_SUCCESS;
 }

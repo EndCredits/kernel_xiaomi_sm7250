@@ -716,7 +716,6 @@ struct wma_invalid_peer_params {
  * @roam_synch_in_progress: flag is in progress or not
  * @plink_status_req: link status request
  * @psnr_req: snr request
- * @delay_before_vdev_stop: delay
  * @tx_streams: number of tx streams can be used by the vdev
  * @mac_id: the mac on which vdev is on
  * @wep_default_key_idx: wep default index for group key
@@ -766,7 +765,6 @@ struct wma_txrx_node {
 	bool roam_synch_in_progress;
 	void *plink_status_req;
 	void *psnr_req;
-	uint8_t delay_before_vdev_stop;
 #ifdef FEATURE_WLAN_EXTSCAN
 	bool extscan_in_progress;
 #endif
@@ -1732,7 +1730,7 @@ void wma_process_set_pdev_vht_ie_req(tp_wma_handle wma,
 		struct set_ie_param *ie_params);
 
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
-			   uint8_t vdev_id, bool roam_synch_in_progress);
+			   uint8_t vdev_id, bool no_fw_peer_delete);
 
 QDF_STATUS wma_create_peer(tp_wma_handle wma, uint8_t peer_addr[6],
 			   u_int32_t peer_type, u_int8_t vdev_id,

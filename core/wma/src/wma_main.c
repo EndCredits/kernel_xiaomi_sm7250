@@ -1067,6 +1067,13 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 				WMA_LOGE("dbglog_module_log_enable failed ret %d",
 					 ret);
 			break;
+		case WMI_DBGLOG_MOD_WOW_LOG_LEVEL:
+			ret = dbglog_set_mod_wow_log_lvl(wma->wmi_handle,
+							 privcmd->param_value);
+			if (ret)
+				wma_err("WMI_DBGLOG_MOD_WOW_LOG_LEVEL failed ret %d",
+					ret);
+			break;
 		case WMI_DBGLOG_TYPE:
 			ret = dbglog_parser_type_init(wma->wmi_handle,
 							privcmd->param_value);
@@ -1450,10 +1457,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			break;
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT2G:
 			wma->pdevconfig.txpow2g = privcmd->param_value;
-			if ((mac->mlme_cfg->gen.band_capability ==
-			     BAND_ALL) ||
-			    (mac->mlme_cfg->gen.band_capability ==
-			     BAND_2G))
+			if (mac->mlme_cfg->gen.band_capability & BIT(REG_BAND_2G))
 				mac->mlme_cfg->power.current_tx_power_level =
 					(uint8_t)privcmd->param_value;
 			else
@@ -1461,10 +1465,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			break;
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT5G:
 			wma->pdevconfig.txpow5g = privcmd->param_value;
-			if ((mac->mlme_cfg->gen.band_capability ==
-			     BAND_ALL) ||
-			    (mac->mlme_cfg->gen.band_capability ==
-			     BAND_5G))
+			if (mac->mlme_cfg->gen.band_capability & BIT(REG_BAND_5G))
 				mac->mlme_cfg->power.current_tx_power_level =
 					(uint8_t)privcmd->param_value;
 			else
@@ -2866,7 +2867,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	bool val = 0;
 	void *cds_context;
 	target_resource_config *wlan_res_cfg;
-	uint8_t delay_before_vdev_stop;
 	uint32_t self_gen_frm_pwr = 0;
 
 	WMA_LOGD("%s: Enter", __func__);
@@ -3041,13 +3041,9 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		goto err_scn_context;
 	}
 
-	for (i = 0; i < wma_handle->max_bssid; ++i) {
+	for (i = 0; i < wma_handle->max_bssid; ++i)
 		wma_vdev_init(&wma_handle->interfaces[i]);
-		ucfg_mlme_get_delay_before_vdev_stop(wma_handle->psoc,
-						     &delay_before_vdev_stop);
-		wma_handle->interfaces[i].delay_before_vdev_stop =
-							delay_before_vdev_stop;
-	}
+
 	/* Register the debug print event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					wmi_debug_print_event_id,
@@ -3237,12 +3233,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_handle->staModDtim = ucfg_pmo_get_sta_mod_dtim(wma_handle->psoc);
 	wma_handle->staDynamicDtim =
 			ucfg_pmo_get_sta_dynamic_dtim(wma_handle->psoc);
-
-	/* register for install key completion event */
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-				wmi_vdev_install_key_complete_event_id,
-				wma_vdev_install_key_complete_event_handler,
-				WMA_RX_SERIALIZER_CTX);
 
 #ifdef WLAN_FEATURE_STATS_EXT
 	/* register for extended stats event */
@@ -5155,28 +5145,37 @@ wma_update_sar_version(struct wlan_psoc_host_service_ext_param *param,
  * wma_update_hdd_band_cap() - update band cap which hdd understands
  * @supported_band: supported band which has been given by FW
  * @tgt_cfg: target configuration to be updated
+ * @psoc: psoc ptr
  *
  * Convert WMA given supported band to enum which HDD understands
  *
  * Return: None
  */
 static void wma_update_hdd_band_cap(WMI_PHY_CAPABILITY supported_band,
-				    struct wma_tgt_cfg *tgt_cfg)
+				    struct wma_tgt_cfg *tgt_cfg,
+				    struct wlan_objmgr_psoc *psoc)
 {
 	switch (supported_band) {
 	case WMI_11G_CAPABILITY:
 	case WMI_11NG_CAPABILITY:
-		tgt_cfg->band_cap = BAND_2G;
+		tgt_cfg->band_cap = BIT(REG_BAND_2G);
 		break;
 	case WMI_11A_CAPABILITY:
 	case WMI_11NA_CAPABILITY:
 	case WMI_11AC_CAPABILITY:
-		tgt_cfg->band_cap = BAND_5G;
+		tgt_cfg->band_cap = BIT(REG_BAND_5G);
 		break;
 	case WMI_11AG_CAPABILITY:
 	case WMI_11NAG_CAPABILITY:
+	case WMI_11AX_CAPABILITY:
+		tgt_cfg->band_cap = (BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
+		if (wlan_reg_is_6ghz_supported(psoc))
+			tgt_cfg->band_cap |= BIT(REG_BAND_6G);
+		break;
 	default:
-		tgt_cfg->band_cap = BAND_ALL;
+		tgt_cfg->band_cap = (BIT(REG_BAND_2G) |
+				     BIT(REG_BAND_5G) |
+				     BIT(REG_BAND_6G));
 	}
 }
 
@@ -5504,7 +5503,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	tgt_cfg.dfs_cac_offload = wma_handle->is_dfs_offloaded;
 	tgt_cfg.rcpi_enabled = wma_handle->rcpi_enabled;
 	wma_update_hdd_band_cap(target_if_get_phy_capability(tgt_hdl),
-				&tgt_cfg);
+				&tgt_cfg, wma_handle->psoc);
 	wma_update_sar_version(service_ext_param, &tgt_cfg);
 	tgt_cfg.fine_time_measurement_cap =
 		target_if_get_wmi_fw_sub_feat_caps(tgt_hdl);

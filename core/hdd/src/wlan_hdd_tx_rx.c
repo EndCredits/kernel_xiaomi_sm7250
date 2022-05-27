@@ -486,6 +486,8 @@ int hdd_set_udp_qos_upgrade_config(struct hdd_adapter *adapter,
 
 	adapter->upgrade_udp_qos_threshold = priority;
 
+	hdd_debug("UDP packets qos upgrade to: %d", priority);
+
 	return 0;
 }
 
@@ -1012,6 +1014,11 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_DATA,
 				   "Invalid HDD context");
+		goto drop_pkt;
+	}
+
+	if (hdd_ctx->hdd_wlan_suspended) {
+		hdd_err_rl("Device is system suspended, drop pkt");
 		goto drop_pkt;
 	}
 
@@ -1990,6 +1997,13 @@ QDF_STATUS hdd_rx_pkt_thread_enqueue_cbk(void *adapter,
 	}
 
 	vdev_id = hdd_adapter->vdev_id;
+
+	if (vdev_id >= WLAN_UMAC_VDEV_ID_MAX) {
+		hdd_info_rl("Vdev invalid. Dropping packets");
+		qdf_nbuf_list_free(nbuf_list);
+		return QDF_STATUS_E_NETDOWN;
+	}
+
 	head_ptr = nbuf_list;
 	while (head_ptr) {
 		qdf_nbuf_cb_update_vdev_id(head_ptr, vdev_id);
@@ -2063,6 +2077,9 @@ hdd_rx_check_qdisc_for_adapter(struct hdd_adapter *adapter, uint8_t rx_ctx_id)
 	struct netdev_queue *ingress_q;
 	struct Qdisc *ingress_qdisc;
 	bool is_qdisc_ingress = false;
+
+	if (qdf_unlikely(!soc))
+		return;
 
 	/*
 	 * This additional ingress_queue NULL check is to avoid
@@ -2453,11 +2470,6 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 				hdd_tx_rx_collect_connectivity_stats_info(
 					skb, adapter,
 					PKT_TYPE_RX_REFUSED, &pkt_type);
-			DPTRACE(qdf_dp_log_proto_pkt_info(NULL, NULL, 0, 0,
-						      QDF_RX,
-						      QDF_TRACE_DEFAULT_MSDU_ID,
-						      QDF_TX_RX_STATUS_DROP));
-
 		}
 	}
 
@@ -3130,6 +3142,32 @@ void hdd_send_rps_disable_ind(struct hdd_adapter *adapter)
 	cds_cfg->rps_enabled = false;
 }
 
+#ifdef IPA_LAN_RX_NAPI_SUPPORT
+void hdd_adapter_set_rps(uint8_t vdev_id, bool enable)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return;
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+	if (!adapter) {
+		hdd_err_rl("Adapter not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	hdd_debug("Set RPS to %d for vdev_id %d", enable, vdev_id);
+	if (!hdd_ctx->rps) {
+		if (enable)
+			hdd_send_rps_ind(adapter);
+		else
+			hdd_send_rps_disable_ind(adapter);
+	}
+}
+#endif
+
 void hdd_tx_queue_cb(hdd_handle_t hdd_handle, uint32_t vdev_id,
 		     enum netif_action_type action,
 		     enum netif_reason_type reason)
@@ -3176,6 +3214,17 @@ void hdd_reset_tcp_delack(struct hdd_context *hdd_ctx)
 	rx_tp_data.rx_tp_flags |= TCP_DEL_ACK_IND;
 	rx_tp_data.level = next_level;
 	hdd_ctx->rx_high_ind_cnt = 0;
+	wlan_hdd_update_tcp_rx_param(hdd_ctx, &rx_tp_data);
+}
+
+void hdd_reset_tcp_adv_win_scale(struct hdd_context *hdd_ctx)
+{
+	enum wlan_tp_level next_level = WLAN_SVC_TP_NONE;
+	struct wlan_rx_tp_data rx_tp_data = {0};
+
+	rx_tp_data.rx_tp_flags |= TCP_ADV_WIN_SCL;
+	rx_tp_data.level = next_level;
+	hdd_ctx->cur_rx_level = WLAN_SVC_TP_NONE;
 	wlan_hdd_update_tcp_rx_param(hdd_ctx, &rx_tp_data);
 }
 
@@ -3430,9 +3479,11 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 		       struct hdd_context *hdd_ctx)
 {
 	struct hdd_config *config;
-	qdf_size_t array_out_size;
+	uint16_t cfg_len;
 
 	config = hdd_ctx->config;
+	cfg_len = qdf_str_len(cfg_get(psoc, CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST))
+		  + 1;
 	hdd_ini_tx_flow_control(config, psoc);
 	hdd_ini_bus_bandwidth(config, psoc);
 	hdd_ini_tcp_settings(config, psoc);
@@ -3448,9 +3499,18 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 	config->rx_thread_affinity_mask =
 		cfg_get(psoc, CFG_DP_RX_THREAD_CPU_MASK);
 	config->fisa_enable = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
-	qdf_uint8_array_parse(cfg_get(psoc, CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST),
-			      config->cpu_map_list,
-			      sizeof(config->cpu_map_list), &array_out_size);
+	if (cfg_len < CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST_LEN) {
+		qdf_str_lcopy(config->cpu_map_list,
+			      cfg_get(psoc, CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST),
+			      cfg_len);
+	} else {
+		hdd_err("ini string length greater than max size %d",
+			CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST_LEN);
+		cfg_len = qdf_str_len(cfg_default(CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST));
+		qdf_str_lcopy(config->cpu_map_list,
+			      cfg_default(CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST),
+			      cfg_len);
+	}
 	config->tx_orphan_enable = cfg_get(psoc, CFG_DP_TX_ORPHAN_ENABLE);
 	config->rx_mode = cfg_get(psoc, CFG_DP_RX_MODE);
 	hdd_set_rx_mode_value(hdd_ctx);

@@ -571,7 +571,7 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 	}
 
 	if (chan_width >= CH_WIDTH_INVALID) {
-		wma_err_rl("%s : Invalid channel width", __func__);
+		wma_err_rl("%s : Invalid channel width %d", __func__, chan_width);
 		return WLAN_PHYMODE_AUTO;
 	}
 
@@ -2477,7 +2477,8 @@ static int wma_wake_event_packet(
 		 * dump event buffer which contains more info regarding
 		 * current page fault.
 		 */
-		WMA_LOGD("PAGE_FAULT occurs during suspend:");
+		wma_debug("PAGE_FAULT occurs during suspend: packet_len %u",
+			  packet_len);
 		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 				   packet, packet_len);
 		break;
@@ -4876,8 +4877,8 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 
 	param_buf = (wmi_pdev_chip_power_stats_event_fixed_param *)
 		param_tlvs->fixed_param;
-	if (!mac || !mac->sme.power_stats_resp_callback) {
-		WMA_LOGD("%s: NULL mac ptr or HDD callback is null", __func__);
+	if (!mac) {
+		wma_debug("NULL mac ptr");
 		return -EINVAL;
 	}
 
@@ -4929,8 +4930,10 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 	qdf_mem_copy(power_stats_results->debug_registers,
 			debug_registers, stats_registers_len);
 
-	mac->sme.power_stats_resp_callback(power_stats_results,
-			mac->sme.power_debug_stats_context);
+	if (mac->sme.sme_power_debug_stats_callback)
+		mac->sme.sme_power_debug_stats_callback(mac,
+							power_stats_results);
+
 	qdf_mem_free(power_stats_results);
 	return 0;
 }

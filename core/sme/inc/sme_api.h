@@ -2115,7 +2115,17 @@ QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bssid,
  */
 QDF_STATUS sme_delete_mon_session(mac_handle_t mac_handle, uint8_t vdev_id);
 
-void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id);
+/**
+ * sme_set_vdev_ies_per_band() - sends the per band IEs to vdev
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: vdev_id for which IE is targeted
+ * @device_mode: vdev mode
+ *
+ * Return: None
+ */
+void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum QDF_OPMODE device_mode);
+
 void sme_set_pdev_ht_vht_ies(mac_handle_t mac_handle, bool enable2x2);
 
 /**
@@ -2290,6 +2300,24 @@ QDF_STATUS sme_set_lost_link_info_cb(mac_handle_t mac_handle,
 QDF_STATUS sme_update_new_channel_event(mac_handle_t mac_handle,
 					uint8_t session_id);
 #ifdef WLAN_POWER_DEBUG
+/**
+ * sme_reset_power_debug_stats_cb() - SME API to reset Power debug stats cb
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Resets the power stats callback and context to NULL
+ *
+ * Return: None
+ */
+void sme_reset_power_debug_stats_cb(mac_handle_t mac_handle);
+
+/**
+ * sme_power_debug_stats_req() - SME API to collect Power debug stats
+ * @mac_handle: Opaque handle to the global MAC context
+ * @callback_fn: Pointer to the callback function for Power stats event
+ * @power_stats_context: Pointer to context
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS sme_power_debug_stats_req(
 		mac_handle_t mac_handle,
 		void (*callback_fn)(struct power_stats_response *response,
@@ -2360,6 +2388,20 @@ QDF_STATUS sme_get_nud_debug_stats(mac_handle_t mac_handle,
 QDF_STATUS sme_set_nud_debug_stats_cb(mac_handle_t mac_handle,
 			void (*cb)(void *, struct rsp_stats *, void *context),
 			void *context);
+
+/**
+ * sme_set_del_peers_ind_callback() - Register del peers ind callback
+ * @mac_handle - MAC global handle
+ * @callback_routine - callback routine from HDD
+ *
+ * This API is invoked by HDD to register its callback to mac
+ *
+ * Return: QDF_STATUS
+ */
+void
+sme_set_del_peers_ind_callback(mac_handle_t mac_handle,
+			       void (*callback)(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id));
 
 /**
  * sme_set_chan_info_callback() - Register chan info callback

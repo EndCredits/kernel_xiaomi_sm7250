@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -396,7 +396,8 @@ static uint16_t wma_match_he_rate(uint16_t raw_rate,
 								guard_interval);
 
 				if (match_rate) {
-					*mcs_rate_flag &= ~TX_RATE_HE80;
+					*mcs_rate_flag &= ~(TX_RATE_HE80 |
+							    TX_RATE_HE160);
 					goto rate_found;
 				}
 			}
@@ -4390,8 +4391,6 @@ QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("%s: Failed to send vdev up cmd: vdev %d",
 			 __func__, vdev_id);
-		policy_mgr_set_do_hw_mode_change_flag(
-			wma->psoc, false);
 		status = QDF_STATUS_E_FAILURE;
 	} else {
 		wma_set_vdev_mgmt_rate(wma, vdev_id);

@@ -1941,7 +1941,14 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 	 * 2) PE receives eWNI_SME_ASSOC_CNF from SME
 	 * 3) BTAMP-AP sends Re/Association Response to BTAMP-STA
 	 */
-	lim_send_mlm_assoc_ind(mac, sta, pe_session);
+	if (lim_send_mlm_assoc_ind(mac, sta, pe_session) != QDF_STATUS_SUCCESS)
+		lim_reject_association(mac, sta->staAddr,
+				       sta->mlmStaContext.subType,
+				       true, sta->mlmStaContext.authType,
+				       sta->assocId, true,
+				       eSIR_MAC_UNSPEC_FAILURE_STATUS,
+				       pe_session);
+
 	/* fall though to reclaim the original Add STA Response message */
 end:
 	if (0 != limMsgQ->bodyptr) {
@@ -2815,14 +2822,12 @@ static void lim_process_switch_channel_join_req(
 		&session_entry->lim_join_req->addIEScan.length,
 		session_entry->lim_join_req->addIEScan.addIEdata);
 
-	if (session_entry->opmode == QDF_P2P_CLIENT_MODE) {
-		/* Activate Join Periodic Probe Req timer */
-		if (tx_timer_activate
-			(&mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer)
-			!= TX_SUCCESS) {
-			pe_err("Periodic JoinReq timer activate failed");
-			goto error;
-		}
+	/* Activate Join Periodic Probe Req timer */
+	if (tx_timer_activate
+		(&mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer)
+		!= TX_SUCCESS) {
+		pe_err("Periodic JoinReq timer activate failed");
+		goto error;
 	}
 
 	return;
@@ -2965,7 +2970,6 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		 */
 		policy_mgr_update_connection_info(mac->psoc,
 						pe_session->smeSessionId);
-		policy_mgr_set_do_hw_mode_change_flag(mac->psoc, true);
 		break;
 	case LIM_SWITCH_CHANNEL_MONITOR:
 		lim_handle_mon_switch_channel_rsp(pe_session, status);

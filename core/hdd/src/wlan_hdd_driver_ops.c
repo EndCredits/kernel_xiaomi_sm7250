@@ -96,6 +96,31 @@ static int hdd_get_bandwidth_level(void *data)
 	return ret;
 }
 
+#ifdef DP_MEM_PRE_ALLOC
+
+/**
+ * hdd_get_consistent_mem_unaligned() - API to get consistent unaligned mem
+ * @size: Size of memory required
+ * @paddr: Pointer to paddr to be filled in by API
+ * @ring_type: Pointer to ring type for which consistent memory is needed
+ *
+ * Return: Virtual address of consistent memory on success, else null
+ */
+static inline
+void *hdd_get_consistent_mem_unaligned(size_t size,
+				       qdf_dma_addr_t *paddr,
+				       uint32_t ring_type)
+{
+	return hdd_get_prealloc_dma_mem_unaligned(size, paddr, ring_type);
+}
+
+static inline
+void hdd_put_consistent_mem_unaligned(void *vaddr)
+{
+	hdd_put_prealloc_dma_mem_unaligned(vaddr);
+}
+#endif
+
 /**
  * hdd_set_recovery_in_progress() - API to set recovery in progress
  * @data: Context
@@ -173,6 +198,12 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 	cbk->is_driver_unloading = hdd_is_driver_unloading;
 	cbk->is_target_ready = hdd_is_target_ready;
 	cbk->get_bandwidth_level = hdd_get_bandwidth_level;
+#ifdef DP_MEM_PRE_ALLOC
+	cbk->prealloc_get_consistent_mem_unaligned =
+		hdd_get_consistent_mem_unaligned;
+	cbk->prealloc_put_consistent_mem_unaligned =
+		hdd_put_consistent_mem_unaligned;
+#endif
 }
 
 #ifdef FORCE_WAKE
@@ -198,6 +229,38 @@ static void hdd_hif_set_attribute(struct hif_opaque_softc *hif_ctx)
 #else
 static void hdd_hif_set_attribute(struct hif_opaque_softc *hif_ctx)
 {}
+#endif
+
+/**
+
+ * hdd_hif_set_ce_max_yield_time() - Wrapper API to set CE max yield time
+ * @hif_ctx: hif context
+ * @bus_type: underlying bus type
+ * @ce_service_max_yield_time: max yield time to be set
+ *
+ * Return: None
+ */
+#if defined(CONFIG_SLUB_DEBUG_ON)
+#define CE_SNOC_MAX_YIELD_TIME_US 2000
+
+static void hdd_hif_set_ce_max_yield_time(struct hif_opaque_softc *hif_ctx,
+					  enum qdf_bus_type bus_type,
+					  uint32_t ce_service_max_yield_time)
+{
+	if (bus_type == QDF_BUS_TYPE_SNOC &&
+	    ce_service_max_yield_time < CE_SNOC_MAX_YIELD_TIME_US)
+		ce_service_max_yield_time = CE_SNOC_MAX_YIELD_TIME_US;
+
+	hif_set_ce_service_max_yield_time(hif_ctx, ce_service_max_yield_time);
+}
+
+#else
+static void hdd_hif_set_ce_max_yield_time(struct hif_opaque_softc *hif_ctx,
+					  enum qdf_bus_type bus_type,
+					  uint32_t ce_service_max_yield_time)
+{
+	hif_set_ce_service_max_yield_time(hif_ctx, ce_service_max_yield_time);
+}
 #endif
 
 /**
@@ -319,7 +382,8 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 		}
 	}
 
-	hif_set_ce_service_max_yield_time(hif_ctx,
+	hdd_hif_set_ce_max_yield_time(
+				hif_ctx, bus_type,
 				cfg_get(hdd_ctx->psoc,
 					CFG_DP_CE_SERVICE_MAX_YIELD_TIME));
 	ucfg_pmo_psoc_set_hif_handle(hdd_ctx->psoc, hif_ctx);
@@ -644,17 +708,17 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 		return errno;
 
 	errno = __hdd_soc_recovery_reinit(dev, bdev, bid, bus_type);
-	if (errno)
-		return errno;
+
 
 	osif_psoc_sync_trans_stop(psoc_sync);
 
-	return 0;
+	return errno;
 }
 
 static void __hdd_soc_remove(struct device *dev)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	void *hif_ctx;
 
 	QDF_BUG(hdd_ctx);
 	if (!hdd_ctx)
@@ -662,6 +726,15 @@ static void __hdd_soc_remove(struct device *dev)
 
 	pr_info("%s: Removing driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
+
+	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
+	if (hif_ctx) {
+		/*
+		 * Trigger runtime sync resume before setting unload in progress
+		 * such that resume can happen successfully
+		 */
+		hif_pm_runtime_sync_resume(hif_ctx);
+	}
 
 	cds_set_driver_loaded(false);
 	cds_set_unload_in_progress(true);
@@ -1020,16 +1093,20 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	void *hif_ctx;
 	void *dp_soc;
 	struct pmo_wow_enable_params pmo_params;
+	int pending;
 
 	hdd_info("starting bus suspend");
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	err = wlan_hdd_validate_context(hdd_ctx);
-	if (err) {
-		hdd_err("Invalid hdd context: %d", err);
-		return err;
-	}
 
+	err = wlan_hdd_validate_context(hdd_ctx);
+	if (err)
+		return err;
+
+	/* Wait for the stop module if already in progress */
+	hdd_psoc_idle_timer_stop(hdd_ctx);
+
+	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Module closed; skipping suspend");
 		return 0;
@@ -1075,10 +1152,19 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 		goto late_hif_resume;
 	}
 
+	hif_system_pm_set_state_suspended(hif_ctx);
+
 	err = hif_bus_suspend(hif_ctx);
 	if (err) {
 		hdd_err("Failed hif bus suspend: %d", err);
 		goto resume_pmo;
+	}
+
+	pending = cdp_rx_get_pending(cds_get_context(QDF_MODULE_ID_SOC));
+	if (pending) {
+		hdd_debug("Prevent suspend, RX frame pending %d", pending);
+		err = -EBUSY;
+		goto resume_hif;
 	}
 
 	/*
@@ -1089,6 +1175,10 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 
 	hdd_info("bus suspend succeeded");
 	return 0;
+
+resume_hif:
+	status = hif_bus_resume(hif_ctx);
+	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 resume_pmo:
 	status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
@@ -1102,6 +1192,7 @@ late_hif_resume:
 resume_cdp:
 	status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	hif_system_pm_set_state_on(hif_ctx);
 
 	return err;
 }
@@ -1138,15 +1229,22 @@ int wlan_hdd_bus_suspend_noirq(void)
 	uint32_t pending_events;
 
 	hdd_debug("start bus_suspend_noirq");
+
+	if (!hdd_ctx) {
+		hdd_err_rl("hdd context is NULL");
+		return -ENODEV;
+	}
+
+	/* If Wifi is off, return success for system suspend */
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		hdd_debug("Driver module closed; skip bus-noirq suspend");
+		return 0;
+	}
+
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno) {
 		hdd_err("Invalid HDD context: errno %d", errno);
 		return errno;
-	}
-
-	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
-		hdd_debug("Driver module closed; skip bus-noirq suspend");
-		return 0;
 	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
@@ -1216,15 +1314,21 @@ int wlan_hdd_bus_resume(void)
 
 	hdd_info("starting bus resume");
 
+	if (!hdd_ctx) {
+		hdd_err_rl("hdd context is NULL");
+		return -ENODEV;
+	}
+
+	/* If Wifi is off, return success for system resume */
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		hdd_debug("Driver Module closed; return success");
+		return 0;
+	}
+
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status) {
 		hdd_err("Invalid hdd context");
 		return status;
-	}
-
-	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
-		hdd_debug("Driver Module closed; return success");
-		return 0;
 	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
@@ -1251,6 +1355,8 @@ int wlan_hdd_bus_resume(void)
 		goto out;
 	}
 
+	hif_system_pm_set_state_resuming(hif_ctx);
+
 	qdf_status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
 						  QDF_SYSTEM_SUSPEND);
 	status = qdf_status_to_os_return(qdf_status);
@@ -1258,6 +1364,8 @@ int wlan_hdd_bus_resume(void)
 		hdd_err("Failed pmo bus resume");
 		goto out;
 	}
+
+	hif_system_pm_set_state_on(hif_ctx);
 
 	status = hif_bus_late_resume(hif_ctx);
 	if (status) {
@@ -1277,6 +1385,7 @@ int wlan_hdd_bus_resume(void)
 	return 0;
 
 out:
+	hif_system_pm_set_state_suspended(hif_ctx);
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
 		cds_is_fw_down())
 		return 0;
@@ -1306,15 +1415,21 @@ int wlan_hdd_bus_resume_noirq(void)
 	if (cds_is_driver_recovering())
 		return 0;
 
+	if (!hdd_ctx) {
+		hdd_err_rl("hdd context is NULL");
+		return -ENODEV;
+	}
+
+	/* If Wifi is off, return success for system resume */
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		hdd_debug("Driver Module closed return success");
+		return 0;
+	}
+
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status) {
 		hdd_err("Invalid HDD context: %d", status);
 		return status;
-	}
-
-	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
-		hdd_debug("Driver Module closed return success");
-		return 0;
 	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
@@ -1405,6 +1520,11 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 		return -EBUSY;
 	}
 
+	if (ucfg_ipa_is_tx_pending(hdd_ctx->pdev)) {
+		hdd_debug("IPA TX comps pending, ignore rtpm suspend");
+		return -EBUSY;
+	}
+
 	status = ucfg_pmo_psoc_bus_runtime_suspend(hdd_ctx->psoc,
 						   hdd_pld_runtime_suspend_cb);
 	err = qdf_status_to_os_return(status);
@@ -1461,8 +1581,12 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 	hdd_debug("Starting runtime resume");
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (wlan_hdd_validate_context(hdd_ctx))
+
+	if (cds_is_driver_recovering()) {
+		hdd_debug("Recovery in progress, state:0x%x",
+			  cds_get_driver_state());
 		return 0;
+	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver module closed skipping runtime resume");

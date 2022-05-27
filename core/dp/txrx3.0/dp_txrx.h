@@ -426,6 +426,31 @@ QDF_STATUS dp_prealloc_init(void);
 void dp_prealloc_deinit(void);
 
 /**
+ * dp_prealloc_get_context_memory() - gets pre-alloc DP context memory from
+ *				      global pool
+ * @ctxt_type: type of DP context
+ *
+ * This is done only as part of init happening in a single context. Hence
+ * no lock is used for protection
+ *
+ * Return: Address of context
+ */
+void *dp_prealloc_get_context_memory(uint32_t ctxt_type);
+
+/**
+ * dp_prealloc_put_context_memory() - puts back pre-alloc DP context memory to
+ *				      global pool
+ * @ctxt_type: type of DP context
+ * @vaddr: address of DP context
+ *
+ * This is done only as part of de-init happening in a single context. Hence
+ * no lock is used for protection
+ *
+ * Return: Failure if address not found
+ */
+QDF_STATUS dp_prealloc_put_context_memory(uint32_t ctxt_type, void *vaddr);
+
+/**
  * dp_prealloc_get_coherent() - gets pre-alloc DP memory
  * @size: size of memory needed
  * @base_vaddr_unaligned: Unaligned virtual address.
@@ -478,6 +503,26 @@ void dp_prealloc_get_multi_pages(uint32_t src_type,
  */
 void dp_prealloc_put_multi_pages(uint32_t src_type,
 				 struct qdf_mem_multi_page_t *pages);
+/**
+ * dp_prealloc_get_consistent_mem_unaligned() - gets pre-alloc unaligned
+						consistent memory
+ * @size: total memory size
+ * @base_addr: pointer to dma address.
+ * @ring_type: HAL ring type that requires memory
+ *
+ * Return: memory virtual address pointer, NULL if fail
+ */
+void *dp_prealloc_get_consistent_mem_unaligned(size_t size,
+					       qdf_dma_addr_t *base_addr,
+					       uint32_t ring_type);
+/**
+ * dp_prealloc_put_consistent_mem_unaligned() - puts back pre-alloc unaligned
+						consistent memory
+ * @va_unaligned: memory virtual address pointer.
+ *
+ * Return: None
+ */
+void dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned);
 
 #else
 static inline QDF_STATUS dp_prealloc_init(void) { return QDF_STATUS_SUCCESS; }
@@ -486,4 +531,12 @@ static inline void dp_prealloc_deinit(void) { }
 
 #endif
 
+/**
+ * dp_rx_tm_get_pending() - get number of frame in thread
+ * nbuf queue pending
+ * @soc: ol_txrx_soc_handle object
+ *
+ * Return: number of frames
+ */
+int dp_rx_tm_get_pending(ol_txrx_soc_handle soc);
 #endif /* _DP_TXRX_H */

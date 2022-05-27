@@ -897,7 +897,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_NSS_CMD:
 	{
 		hdd_debug("QCASAP_NSS_CMD val %d", set_value);
-		hdd_update_nss(adapter, set_value);
+		hdd_update_nss(adapter, set_value, set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
 					  WMI_VDEV_PARAM_NSS,
 					  set_value, VDEV_CMD);
@@ -1139,7 +1139,7 @@ static __iw_softap_getparam(struct net_device *dev,
 
 	switch (sub_cmd) {
 	case QCSAP_PARAM_MAX_ASSOC:
-		if (ucfg_mlme_set_assoc_sta_limit(hdd_ctx->psoc, *value) !=
+		if (ucfg_mlme_get_assoc_sta_limit(hdd_ctx->psoc, value) !=
 		    QDF_STATUS_SUCCESS) {
 			hdd_err("CFG_ASSOC_STA_LIMIT failed");
 			ret = -EIO;
@@ -2253,9 +2253,9 @@ static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
 		}
 
 		written += scnprintf(buf + written, size - written,
-				     QDF_MAC_ADDR_FMT
+				     QDF_FULL_MAC_FMT
 				     " ecsa=%d\n",
-				     QDF_MAC_ADDR_REF(sta->sta_mac.bytes),
+				     QDF_FULL_MAC_REF(sta->sta_mac.bytes),
 				     sta->ecsa_capable);
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta, true,
 				     STA_INFO_SOFTAP_GET_STA_INFO);
@@ -2627,8 +2627,8 @@ __iw_get_peer_rssi(struct net_device *dev, struct iw_request_info *info,
 		wrqu->data.length +=
 			scnprintf(extra + wrqu->data.length,
 				  IW_PRIV_SIZE_MASK - wrqu->data.length,
-				  "["QDF_MAC_ADDR_FMT"] [%d]\n",
-				  QDF_MAC_ADDR_REF(rssi_info->peer_stats[i].peer_macaddr),
+				  "["QDF_FULL_MAC_FMT"] [%d]\n",
+				  QDF_FULL_MAC_REF(rssi_info->peer_stats[i].peer_macaddr),
 				  rssi_info->peer_stats[i].peer_rssi);
 
 	wrqu->data.length++;

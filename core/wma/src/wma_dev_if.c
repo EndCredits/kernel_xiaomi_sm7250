@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,6 +85,7 @@
 #include "wlan_mlme_public_struct.h"
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_main.h"
+#include "wlan_mlme_ucfg_api.h"
 #include <wlan_dfs_utils_api.h>
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_utility.h"
@@ -1090,7 +1091,7 @@ void wma_update_rate_flags_after_vdev_restart(tp_wma_handle wma,
 					      struct wma_txrx_node *iface)
 {
 	struct vdev_mlme_obj *vdev_mlme;
-	enum tx_rate_info *rate_flags;
+	enum tx_rate_info rate_flags = 0;
 	enum wlan_phymode bss_phymode;
 	struct wlan_channel *des_chan;
 
@@ -1101,44 +1102,22 @@ void wma_update_rate_flags_after_vdev_restart(tp_wma_handle wma,
 	if (!vdev_mlme)
 		return;
 
-	rate_flags = &vdev_mlme->mgmt.rate_info.rate_flags;
-
 	des_chan = wlan_vdev_mlme_get_des_chan(iface->vdev);
 	bss_phymode = des_chan->ch_phymode;
 
 	if (IS_WLAN_PHYMODE_HE(bss_phymode)) {
-		if (des_chan->ch_width == CH_WIDTH_160MHZ ||
-		    des_chan->ch_width == CH_WIDTH_80P80MHZ)
-			*rate_flags |= TX_RATE_HE160;
-		else if (des_chan->ch_width == CH_WIDTH_80MHZ)
-			*rate_flags |= TX_RATE_HE80;
-		else if (des_chan->ch_width)
-			*rate_flags |= TX_RATE_HE40;
-		else
-			*rate_flags |= TX_RATE_HE20;
+		rate_flags = wma_get_he_rate_flags(des_chan->ch_width);
 	} else if (IS_WLAN_PHYMODE_VHT(bss_phymode)) {
-		if (des_chan->ch_width == CH_WIDTH_80P80MHZ)
-			*rate_flags |= TX_RATE_VHT160;
-		if (des_chan->ch_width == CH_WIDTH_160MHZ)
-			*rate_flags |= TX_RATE_VHT160;
-		if (des_chan->ch_width == CH_WIDTH_80MHZ)
-			*rate_flags |= TX_RATE_VHT80;
-		else if (des_chan->ch_width)
-			*rate_flags |= TX_RATE_VHT40;
-		else
-			*rate_flags |= TX_RATE_VHT20;
+		rate_flags = wma_get_vht_rate_flags(des_chan->ch_width);
 	} else if (IS_WLAN_PHYMODE_HT(bss_phymode)) {
-		if (des_chan->ch_width)
-			*rate_flags |= TX_RATE_HT40;
-		else
-			*rate_flags |= TX_RATE_HT20;
+		rate_flags = wma_get_ht_rate_flags(des_chan->ch_width);
 	} else {
-		*rate_flags = TX_RATE_LEGACY;
+		rate_flags = TX_RATE_LEGACY;
 	}
 
 	wma_debug("bss phymode %d rate_flags %x, ch_width %d",
-		  bss_phymode, *rate_flags, des_chan->ch_width);
-	ucfg_mc_cp_stats_set_rate_flags(iface->vdev, *rate_flags);
+		  bss_phymode, rate_flags, des_chan->ch_width);
+	ucfg_mc_cp_stats_set_rate_flags(iface->vdev, rate_flags);
 }
 
 QDF_STATUS wma_handle_channel_switch_resp(tp_wma_handle wma,
@@ -1208,8 +1187,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	if (!mac_ctx) {
 		WMA_LOGE("%s: Failed to get mac_ctx", __func__);
-		policy_mgr_set_do_hw_mode_change_flag(
-			psoc, false);
 		return QDF_STATUS_E_FAILURE;
 	}
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
@@ -1296,8 +1273,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		mlme_obj->proto.sta.assoc_id = iface->aid;
 		if (vdev_mgr_up_send(mlme_obj) != QDF_STATUS_SUCCESS) {
 			WMA_LOGE(FL("failed to send vdev up"));
-			policy_mgr_set_do_hw_mode_change_flag(
-				wma->psoc, false);
 			return QDF_STATUS_E_FAILURE;
 		}
 		ucfg_ocb_config_channel(wma->pdev);
@@ -1547,12 +1522,12 @@ bool wma_objmgr_peer_exist(tp_wma_handle wma,
  * @wma: wma handle
  * @mac_addr: peer mac address, to be removed
  * @vdev_id: vdev id
- * @roam_synch_in_progress: roam in progress flag
+ * @no_fw_peer_delete: If true dont send peer delete to firmware
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
-			   uint8_t vdev_id, bool roam_synch_in_progress)
+			   uint8_t vdev_id, bool no_fw_peer_delete)
 {
 #define PEER_ALL_TID_BITMASK 0xffffffff
 	uint32_t peer_tid_bitmap = PEER_ALL_TID_BITMASK;
@@ -1597,8 +1572,9 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 
 	cdp_peer_teardown(soc, vdev_id, peer_addr);
 
-	if (roam_synch_in_progress)
+	if (no_fw_peer_delete)
 		goto peer_detach;
+
 	/* Flush all TIDs except MGMT TID for this peer in Target */
 	peer_tid_bitmap &= ~(0x1 << WMI_MGMT_TID);
 	param.peer_tid_bitmap = peer_tid_bitmap;
@@ -1628,7 +1604,7 @@ peer_detach:
 		wma->interfaces[vdev_id].peer_count);
 	/* Copy peer mac to find and delete objmgr peer */
 	qdf_mem_copy(peer_mac, peer_addr, QDF_MAC_ADDR_SIZE);
-	if (roam_synch_in_progress &&
+	if (no_fw_peer_delete &&
 	    is_cdp_peer_detach_force_delete_supported(soc)) {
 		if (!peer_unmap_conf_support_enabled) {
 			WMA_LOGD("%s: LFR3: trigger force delete for peer "QDF_MAC_ADDR_FMT,
@@ -1640,7 +1616,7 @@ peer_detach:
 					     bitmap);
 		}
 	} else {
-		if (roam_synch_in_progress) {
+		if (no_fw_peer_delete) {
 			WMA_LOGD("%s: LFR3: normal peer delete for peer "QDF_MAC_ADDR_FMT,
 				 __func__, QDF_MAC_ADDR_REF(peer_addr));
 		}
@@ -2255,13 +2231,11 @@ QDF_STATUS
 __wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
-	bool peer_exist = false;
 	struct wma_txrx_node *iface;
 	int status = QDF_STATUS_SUCCESS;
 	struct qdf_mac_addr bssid;
 	uint32_t vdev_stop_type;
 	struct del_bss_resp *vdev_stop_resp;
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	if (!wma) {
 		WMA_LOGE("%s: wma is null", __func__);
@@ -2310,42 +2284,11 @@ __wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event)
 	}
 
 	if (vdev_stop_type == WMA_DELETE_BSS_HO_FAIL_REQ) {
-		peer_exist = cdp_find_peer_exist(soc, OL_TXRX_PDEV_ID,
-						 bssid.bytes);
-		if (!peer_exist) {
-			WMA_LOGE("%s: Failed to find peer "QDF_MAC_ADDR_FMT,
-				 __func__, QDF_MAC_ADDR_REF(bssid.bytes));
-			status = QDF_STATUS_E_FAILURE;
+		status = wma_remove_peer(wma, bssid.bytes,
+					 resp_event->vdev_id, true);
+		if (QDF_IS_STATUS_ERROR(status))
 			goto free_params;
-		}
 
-		if (!iface->peer_count) {
-			WMA_LOGE("%s: Can't remove peer with peer_addr "QDF_MAC_ADDR_FMT" vdevid %d peer_count %d",
-				 __func__, QDF_MAC_ADDR_REF(bssid.bytes),
-				 resp_event->vdev_id,
-				 iface->peer_count);
-			goto free_params;
-		}
-
-		WMA_LOGD("%s: peer_addr "QDF_MAC_ADDR_FMT" to vdev_id %d, peer_count - %d",
-			 __func__, QDF_MAC_ADDR_REF(bssid.bytes),
-			 resp_event->vdev_id, iface->peer_count);
-		if (cdp_cfg_get_peer_unmap_conf_support(soc))
-			cdp_peer_delete_sync(soc, resp_event->vdev_id,
-					     bssid.bytes,
-					     wma_peer_unmap_conf_cb,
-					     1 << CDP_PEER_DELETE_NO_SPECIAL);
-		else
-			cdp_peer_delete(soc, resp_event->vdev_id,
-					bssid.bytes,
-					1 << CDP_PEER_DELETE_NO_SPECIAL);
-		wma_remove_objmgr_peer(wma, resp_event->vdev_id,
-				       bssid.bytes);
-		iface->peer_count--;
-
-		WMA_LOGI("%s: Removed peer "QDF_MAC_ADDR_FMT" vdev_id %d, peer_count %d",
-			 __func__, QDF_MAC_ADDR_REF(bssid.bytes),
-			 resp_event->vdev_id, iface->peer_count);
 		vdev_stop_resp->status = status;
 		vdev_stop_resp->vdev_id = resp_event->vdev_id;
 		wma_send_vdev_down_req(wma, vdev_stop_resp);
@@ -3852,7 +3795,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 				      OL_TXRX_PEER_STATE_CONN);
 		status = wma_set_cdp_vdev_pause_reason(wma, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status))
-			goto peer_cleanup;
+			goto send_resp;
 	}
 
 	wmi_unified_send_txbf(wma, &add_bss->staContext);
@@ -3873,7 +3816,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 				     &add_bss->staContext);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("Failed to send peer assoc status:%d", status);
-		goto peer_cleanup;
+		goto send_resp;
 	}
 
 	/* we just had peer assoc, so install key will be done later */
@@ -3894,7 +3837,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 	if (!mlme_obj) {
 		WMA_LOGE("Failed to mlme obj");
 		status = QDF_STATUS_E_FAILURE;
-		goto peer_cleanup;
+		goto send_resp;
 	}
 	/*
 	 * Store the bssid in interface table, bssid will
@@ -3919,14 +3862,11 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 			 vdev_id);
 		wma_remove_req(wma, vdev_id, WMA_PEER_ASSOC_CNF_START);
 		status = QDF_STATUS_E_FAILURE;
-		goto peer_cleanup;
+		goto send_resp;
 	}
 
 	return QDF_STATUS_SUCCESS;
 
-peer_cleanup:
-	if (peer_exist)
-		wma_remove_peer(wma, add_bss->bssId, vdev_id, false);
 send_resp:
 	wma_send_add_bss_resp(wma, vdev_id, status);
 
@@ -4916,9 +4856,10 @@ fail_del_bss_ho_fail:
 static void wma_wait_tx_complete(tp_wma_handle wma,
 				uint32_t session_id)
 {
-	uint8_t max_wait_iterations = 0;
+	uint8_t max_wait_iterations = 0, delay = 0;
 	cdp_config_param_type val;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status;
 
 	if (!wma_is_vdev_valid(session_id)) {
 		WMA_LOGE("%s: Vdev is not valid: %d",
@@ -4926,10 +4867,11 @@ static void wma_wait_tx_complete(tp_wma_handle wma,
 		return;
 	}
 
-	max_wait_iterations =
-		wma->interfaces[session_id].delay_before_vdev_stop /
-		WMA_TX_Q_RECHECK_TIMER_WAIT;
+	status = ucfg_mlme_get_delay_before_vdev_stop(wma->psoc, &delay);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to get delay before vdev stop");
 
+	max_wait_iterations = delay / WMA_TX_Q_RECHECK_TIMER_WAIT;
 	if (cdp_txrx_get_pdev_param(soc,
 				    wlan_objmgr_pdev_get_pdev_id(wma->pdev),
 				    CDP_TX_PENDING, &val))
@@ -5078,7 +5020,7 @@ void wma_delete_bss(tp_wma_handle wma, uint8_t vdev_id)
 
 detach_peer:
 	wma_remove_peer(wma, bssid.bytes, vdev_id,
-			roam_synch_in_progress);
+			wma_is_roam_synch_in_progress(wma, vdev_id));
 	if (wma_is_roam_synch_in_progress(wma, vdev_id))
 		return;
 
