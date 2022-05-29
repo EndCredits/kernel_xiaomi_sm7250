@@ -244,48 +244,6 @@ ssize_t dsi_display_read_dynamic_fps(struct drm_connector *connector,
 	return ret;
 }
 
-int dsi_display_set_doze_brightness(struct drm_connector *connector,
-			int doze_brightness)
-{
-	struct dsi_display *display = NULL;
-	struct dsi_bridge *c_bridge = NULL;
-
-	if (!connector || !connector->encoder || !connector->encoder->bridge) {
-		pr_err("Invalid connector/encoder/bridge ptr\n");
-		return -EINVAL;
-	}
-
-	c_bridge =  to_dsi_bridge(connector->encoder->bridge);
-	display = c_bridge->display;
-	if (!display || !display->panel) {
-		pr_err("Invalid display/panel ptr\n");
-		return -EINVAL;
-	}
-
-	return dsi_panel_set_doze_brightness(display->panel, doze_brightness, true);
-}
-
-ssize_t dsi_display_get_doze_brightness(struct drm_connector *connector,
-			char *buf)
-{
-	struct dsi_display *display = NULL;
-	struct dsi_bridge *c_bridge = NULL;
-
-	if (!connector || !connector->encoder || !connector->encoder->bridge) {
-		pr_err("Invalid connector/encoder/bridge ptr\n");
-		return -EINVAL;
-	}
-
-	c_bridge =  to_dsi_bridge(connector->encoder->bridge);
-	display = c_bridge->display;
-	if (!display || !display->panel) {
-		pr_err("Invalid display/panel ptr\n");
-		return -EINVAL;
-	}
-
-	return dsi_panel_get_doze_brightness(display->panel, buf);
-}
-
 int dsi_display_read_gamma_param(struct drm_connector *connector)
 {
 	struct dsi_display *display = NULL;

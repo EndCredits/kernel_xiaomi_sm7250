@@ -1091,18 +1091,12 @@ int dsi_display_set_power(struct drm_connector *connector,
 		mi_cfg->in_aod = true;
 		mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp1(display->panel);
-		if (mi_cfg->unset_doze_brightness)
-			dsi_panel_set_doze_brightness(display->panel,
-				mi_cfg->unset_doze_brightness, true);
 		mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
 		break;
 	case SDE_MODE_DPMS_LP2:
 		mi_cfg->in_aod = true;
 		mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp2(display->panel);
-		if (mi_cfg->unset_doze_brightness)
-			dsi_panel_set_doze_brightness(display->panel,
-				mi_cfg->unset_doze_brightness, true);
 		mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
 		break;
 	case SDE_MODE_DPMS_ON:

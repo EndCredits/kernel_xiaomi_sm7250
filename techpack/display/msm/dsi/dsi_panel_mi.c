@@ -69,20 +69,10 @@ static void enter_aod_delayed_work(struct work_struct *work)
 
 	if (panel->power_mode == SDE_MODE_DPMS_LP1 ||
 			panel->power_mode == SDE_MODE_DPMS_LP2) {
-		if (mi_cfg->layer_fod_unlock_success || mi_cfg->sysfs_fod_unlock_success) {
+		if (mi_cfg->layer_fod_unlock_success || mi_cfg->sysfs_fod_unlock_success)
 			pr_info("[%d,%d]Fod fingerprint unlocked successfully, skip to enter aod mode\n",
 				mi_cfg->layer_fod_unlock_success, mi_cfg->sysfs_fod_unlock_success);
 			goto exit;
-		} else {
-			if (!mi_cfg->unset_doze_brightness) {
-				mi_cfg->unset_doze_brightness = mi_cfg->doze_brightness_state;
-			}
-			pr_info("delayed_work runing --- set doze brightness\n");
-			if (mi_cfg->layer_aod_flag)
-				dsi_panel_set_doze_brightness(panel, mi_cfg->unset_doze_brightness, false);
-			else
-				pr_info("delayed_work runing --- skip into doze\n");
-		}
 	}
 
 exit:
@@ -589,8 +579,6 @@ skip_dimlayer_parse:
 	mi_cfg->thermal_hbm_disabled = false;
 	mi_cfg->fod_hbm_enabled = false;
 	mi_cfg->fod_hbm_layer_enabled = false;
-	mi_cfg->doze_brightness_state = DOZE_TO_NORMAL;
-	mi_cfg->unset_doze_brightness = DOZE_TO_NORMAL;
 	mi_cfg->dimming_state = STATE_NONE;
 	mi_cfg->fod_backlight_flag = false;
 	mi_cfg->fod_flag = false;
@@ -2200,132 +2188,6 @@ ssize_t dsi_panel_read_wp_info(struct dsi_panel *panel, char *buf)
 	return count;
 }
 
-int dsi_panel_set_doze_brightness(struct dsi_panel *panel,
-			int doze_brightness, bool need_panel_lock)
-{
-	int rc = 0;
-	struct dsi_panel_mi_cfg *mi_cfg;
-	struct dsi_display *display;
-	int cmd_type = DSI_CMD_SET_MAX;
-	const char *doze_brightness_str[] = {
-		[DOZE_TO_NORMAL] = "DOZE_TO_NORMAL",
-		[DOZE_BRIGHTNESS_HBM] = "DOZE_BRIGHTNESS_HBM",
-		[DOZE_BRIGHTNESS_LBM] = "DOZE_BRIGHTNESS_LBM",
-	};
-
-	if (!panel || !panel->host) {
-		pr_err("invalid params\n");
-		return -EINVAL;
-	}
-
-	display = to_dsi_display(panel->host);
-	if (!display || !display->drm_dev){
-		pr_err("invalid display or drm_dev ptr\n");
-		return -EINVAL;
-	}
-
-	if (need_panel_lock)
-		mutex_lock(&panel->panel_lock);
-
-	mi_cfg = &panel->mi_cfg;
-
-	if (!panel->panel_initialized) {
-		mi_cfg->unset_doze_brightness = doze_brightness;
-		pr_info("Panel not initialized! save unset_doze_brightness = %s\n",
-				doze_brightness_str[mi_cfg->unset_doze_brightness]);
-		goto exit;
-	}
-
-	if (mi_cfg->fod_hbm_enabled) {
-		mi_cfg->unset_doze_brightness = doze_brightness;
-		if (mi_cfg->unset_doze_brightness == DOZE_TO_NORMAL) {
-			mi_cfg->doze_brightness_state = DOZE_TO_NORMAL;
-			mi_cfg->dimming_state = STATE_DIM_BLOCK;
-		}
-		pr_info("fod_hbm_enabled set, save unset_doze_brightness = %s\n",
-				doze_brightness_str[mi_cfg->unset_doze_brightness]);
-		goto exit;
-	}
-
-	if (mi_cfg->in_aod) {
-		if (mi_cfg->doze_brightness_state != doze_brightness ||
-			mi_cfg->unset_doze_brightness != DOZE_TO_NORMAL) {
-			if (mi_cfg->into_aod_pending &&
-				!mi_cfg->layer_aod_flag &&
-				doze_brightness != DOZE_TO_NORMAL) {
-				/* After unlocking the fingerprint, request to enter aod mode,
-				 *but there is no aod layer, skip to set doze brightness */
-				pr_info("aod layer is not ready, skip to set doze brightness\n");
-				rc = -EAGAIN;
-			} else {
-				if (doze_brightness == DOZE_BRIGHTNESS_HBM ||
-					mi_cfg->unset_doze_brightness == DOZE_BRIGHTNESS_HBM) {
-					cmd_type = DSI_CMD_SET_MI_DOZE_HBM;
-					mi_cfg->aod_backlight = 170;
-				} else if (doze_brightness == DOZE_BRIGHTNESS_LBM ||
-					mi_cfg->unset_doze_brightness == DOZE_BRIGHTNESS_LBM) {
-					cmd_type = DSI_CMD_SET_MI_DOZE_LBM;
-					mi_cfg->aod_backlight = 10;
-				}
-			}
-			if (cmd_type != DSI_CMD_SET_MAX) {
-				if (sde_kms_is_suspend_blocked(display->drm_dev)) {
-					pr_err("sde_kms is suspended, skip to set doze brightness\n");
-					mi_cfg->unset_doze_brightness = doze_brightness;
-					rc = -EBUSY;
-					goto exit;
-				} else {
-					rc = dsi_panel_tx_cmd_set(panel, cmd_type);
-					if (rc) {
-						pr_err("[%s] failed to send DSI_CMD_SET_MI_DOZE_%s cmd, rc=%d\n",
-							panel->name, cmd_type == DSI_CMD_SET_MI_DOZE_HBM ? "HBM" : "LBM", rc);
-					}
-				}
-			}
-
-			mi_cfg->dimming_state = STATE_DIM_BLOCK;
-			mi_cfg->unset_doze_brightness = DOZE_TO_NORMAL;
-			mi_cfg->doze_brightness_state = doze_brightness;
-			if (display->drm_conn && display->drm_conn->kdev)
-				sysfs_notify(&display->drm_conn->kdev->kobj, NULL, "doze_brightness");
-			pr_info("set doze brightness to %s\n", doze_brightness_str[doze_brightness]);
-		} else {
-			pr_info("%s has been set, skip\n", doze_brightness_str[doze_brightness]);
-		}
-	} else {
-		mi_cfg->unset_doze_brightness = doze_brightness;
-		if (mi_cfg->unset_doze_brightness != DOZE_TO_NORMAL)
-			pr_info("Not in Doze mode! save unset_doze_brightness = %s\n",
-					doze_brightness_str[mi_cfg->unset_doze_brightness]);
-	}
-
-exit:
-	if (need_panel_lock)
-		mutex_unlock(&panel->panel_lock);
-
-	return rc;
-}
-
-ssize_t dsi_panel_get_doze_brightness(struct dsi_panel *panel, char *buf)
-{
-	ssize_t count = 0;
-	struct dsi_panel_mi_cfg *mi_cfg;
-
-	if (!panel) {
-		pr_err("invalid params\n");
-		return -EAGAIN;
-	}
-
-	mutex_lock(&panel->panel_lock);
-
-	mi_cfg = &panel->mi_cfg;
-	count = snprintf(buf, PAGE_SIZE, "%d\n", mi_cfg->doze_brightness_state);
-
-	mutex_unlock(&panel->panel_lock);
-
-	return count;
-}
-
 ssize_t dsi_panel_lockdown_info_read(unsigned char *plockdowninfo)
 {
 	int rc = 0;
@@ -2952,13 +2814,8 @@ int dsi_panel_set_disp_param(struct dsi_panel *panel, u32 param)
 		if (panel->power_mode == SDE_MODE_DPMS_LP1 ||
 				panel->power_mode == SDE_MODE_DPMS_LP2) {
 			cancel_delayed_work_sync(&mi_cfg->enter_aod_delayed_work);
-			if (mi_cfg->layer_fod_unlock_success) {
+			if (mi_cfg->layer_fod_unlock_success)
 				pr_info("layer_fod_unlock_success is true, skip into aod mode\n");
-			} else {
-				if (!mi_cfg->unset_doze_brightness)
-					mi_cfg->unset_doze_brightness = mi_cfg->doze_brightness_state;
-				dsi_panel_set_doze_brightness(panel, mi_cfg->unset_doze_brightness, false);
-			}
 		}
 		break;
 	case DISPPARAM_DC_ON:
@@ -3002,24 +2859,6 @@ int dsi_panel_set_disp_param(struct dsi_panel *panel, u32 param)
 	case DISPPARAM_SRGB:
 		pr_info("sRGB\n");
 		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_SRGB);
-		break;
-	case DISPPARAM_DOZE_BRIGHTNESS_HBM:
-		if (mi_cfg->in_aod) {
-			pr_info("doze hbm On\n");
-			rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_DOZE_HBM);
-			mi_cfg->dimming_state = STATE_DIM_BLOCK;
-		}
-		break;
-	case DISPPARAM_DOZE_BRIGHTNESS_LBM:
-		if (mi_cfg->in_aod) {
-			pr_info("doze lbm On\n");
-			rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_DOZE_LBM);
-			mi_cfg->dimming_state = STATE_DIM_BLOCK;
-		}
-		break;
-	case DISPPARAM_DOZE_OFF:
-		pr_info("doze Off\n");
-		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_NOLP);
 		break;
 	case DISPPARAM_HBM_BACKLIGHT_RESEND:
 		dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_DIMMINGON);

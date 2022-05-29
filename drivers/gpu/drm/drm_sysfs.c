@@ -329,30 +329,6 @@ static ssize_t dynamic_fps_show(struct device *dev,
 	return dsi_display_read_dynamic_fps(connector, buf);
 }
 
-static ssize_t doze_brightness_store(struct device *device,
-			   struct device_attribute *attr,
-			   const char *buf, size_t count)
-{
-	struct drm_connector *connector = to_drm_connector(device);
-	int doze_brightness;
-	int ret;
-
-	ret = kstrtoint(buf, 0, &doze_brightness);;
-	if (ret)
-		return ret;
-
-	ret = dsi_display_set_doze_brightness(connector, doze_brightness);
-
-	return ret ? ret : count;
-}
-
-static ssize_t doze_brightness_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct drm_connector *connector = to_drm_connector(dev);
-	return dsi_display_get_doze_brightness(connector, buf);
-}
-
 static ssize_t gamma_test_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -453,7 +429,6 @@ static DEVICE_ATTR_RO(oled_pmic_id);
 static DEVICE_ATTR_RO(panel_info);
 static DEVICE_ATTR_RO(wp_info);
 static DEVICE_ATTR_RO(dynamic_fps);
-static DEVICE_ATTR_RW(doze_brightness);
 static DEVICE_ATTR_RO(gamma_test);
 static DEVICE_ATTR_RO(fod_ui_ready);
 static DEVICE_ATTR_RO(smart_fps_value);
@@ -472,7 +447,6 @@ static struct attribute *connector_dev_attrs[] = {
 	&dev_attr_panel_info.attr,
 	&dev_attr_wp_info.attr,
 	&dev_attr_dynamic_fps.attr,
-	&dev_attr_doze_brightness.attr,
 	&dev_attr_gamma_test.attr,
 	&dev_attr_fod_ui_ready.attr,
 	&dev_attr_smart_fps_value.attr,
