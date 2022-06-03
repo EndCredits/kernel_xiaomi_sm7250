@@ -240,7 +240,7 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 
 #ifdef CONFIG_DRM_SDE_EXPO
 	if(panel->dimlayer_exposure) {
-		if (bl_lvl && !panel->mi_cfg.in_aod) {
+		if (bl_lvl && !panel->mi_cfg.in_aod && !panel->mi_cfg.fod_hbm_enabled) {
 			bl_temp = expo_map_dim_level((u32)bl_temp, dsi_display);
 		}
 	}
