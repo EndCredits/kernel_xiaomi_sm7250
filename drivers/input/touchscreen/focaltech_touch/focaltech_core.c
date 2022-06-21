@@ -2522,9 +2522,7 @@ static int fts_ts_suspend(struct device *dev)
 #ifndef CONFIG_FACTORY_BUILD
 #if FTS_GESTURE_EN
 	if (fts_gesture_suspend(ts_data->client) == 0) {
-		if(ts_data->fod_status == -1 || ts_data->fod_status == 100){
-			fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, false);
-		}
+		fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, true);
 		ts_data->suspended = true;
 		ts_data->old_point_id = 0xff;
 		ts_data->point_id_changed = false;
