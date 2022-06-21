@@ -275,24 +275,6 @@ int kallsyms_lookup_size_offset(unsigned long addr, unsigned long *symbolsize,
 	       !!__bpf_address_lookup(addr, symbolsize, offset, namebuf);
 }
 
-#ifdef CONFIG_CFI_CLANG
-/*
- * LLVM appends .cfi to function names when CONFIG_CFI_CLANG is enabled,
- * which causes confusion and potentially breaks user space tools, so we
- * will strip the postfix from expanded symbol names.
- */
-static inline void cleanup_symbol_name(char *s)
-{
-	char *res;
-
-	res = strrchr(s, '.');
-	if (res && !strcmp(res, ".cfi"))
-		*res = '\0';
-}
-#else
-static inline void cleanup_symbol_name(char *s) {}
-#endif
-
 /*
  * Lookup an address
  * - modname is set to NULL if it's in the kernel.
@@ -319,9 +301,7 @@ const char *kallsyms_lookup(unsigned long addr,
 				       namebuf, KSYM_NAME_LEN);
 		if (modname)
 			*modname = NULL;
-
-		ret = namebuf;
-		goto found;
+		return namebuf;
 	}
 
 	/* See if it's in a module or a BPF JITed image. */
@@ -334,16 +314,11 @@ const char *kallsyms_lookup(unsigned long addr,
 	if (!ret)
 		ret = ftrace_mod_address_lookup(addr, symbolsize,
 						offset, modname, namebuf);
-
-found:
-	cleanup_symbol_name(namebuf);
 	return ret;
 }
 
 int lookup_symbol_name(unsigned long addr, char *symname)
 {
-	int res;
-
 	symname[0] = '\0';
 	symname[KSYM_NAME_LEN - 1] = '\0';
 
@@ -354,23 +329,15 @@ int lookup_symbol_name(unsigned long addr, char *symname)
 		/* Grab name */
 		kallsyms_expand_symbol(get_symbol_offset(pos),
 				       symname, KSYM_NAME_LEN);
-		goto found;
+		return 0;
 	}
 	/* See if it's in a module. */
-	res = lookup_module_symbol_name(addr, symname);
-	if (res)
-		return res;
-
-found:
-	cleanup_symbol_name(symname);
-	return 0;
+	return lookup_module_symbol_name(addr, symname);
 }
 
 int lookup_symbol_attrs(unsigned long addr, unsigned long *size,
 			unsigned long *offset, char *modname, char *name)
 {
-	int res;
-
 	name[0] = '\0';
 	name[KSYM_NAME_LEN - 1] = '\0';
 
@@ -382,16 +349,10 @@ int lookup_symbol_attrs(unsigned long addr, unsigned long *size,
 		kallsyms_expand_symbol(get_symbol_offset(pos),
 				       name, KSYM_NAME_LEN);
 		modname[0] = '\0';
-		goto found;
+		return 0;
 	}
 	/* See if it's in a module. */
-	res = lookup_module_symbol_attrs(addr, size, offset, modname, name);
-	if (res)
-		return res;
-
-found:
-	cleanup_symbol_name(name);
-	return 0;
+	return lookup_module_symbol_attrs(addr, size, offset, modname, name);
 }
 
 /* Look up a kernel symbol and return it in a text buffer. */
