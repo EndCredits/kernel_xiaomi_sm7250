@@ -12,6 +12,8 @@
 #  Add clang to your PATH before using this script.
 #
 
+LOCAL_VERSION_NUMBER=v1.0
+
 ARCH=arm64;
 CC=clang;
 CLANG_TRIPLE=aarch64-linux-gnu-;
@@ -27,6 +29,7 @@ TARGET_KERNEL_DTBO=arch/arm64/boot/dtbo.img
 TARGET_KERNEL_NAME=Kernel;
 TARGET_KERNEL_MOD_VERSION=$(make kernelversion);
 
+DEFCONFIG_PATH=arch/arm64/configs
 DEFCONFIG_NAME=vendor/picasso_user_defconfig;
 
 START_SEC=$(date +%s);
@@ -87,7 +90,78 @@ generate_flashable(){
     echo " Target File:  $OUT/$ANYKERNEL_PATH/$TARGET_KERNEL_NAME-$CURRENT_TIME-$TARGET_KERNEL_MOD_VERSION.zip ";
 }
 
-make_defconfig;
-build_kernel;
-link_all_dtb_files;
-generate_flashable;
+save_defconfig(){
+    echo "------------------------------";
+    echo " Saving kernel config ........";
+    echo "------------------------------";
+
+    make CC=$CC ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE CROSS_COMPILE_COMPAT=$CROSS_COMPILE_COMPAT CLANG_TRIPLE=$CLANG_TRIPLE $CC_ADDITION_FLAGS O=$OUT -j$THREAD savedefconfig;
+    END_SEC=$(date +%s);
+    COST_SEC=$[ $END_SEC-$START_SEC ];
+    echo "Finished. Kernel config saved to $OUT/defconfig"
+    echo "Moving kernel defconfig to source tree"
+    mv $OUT/defconfig $DEFCONFIG_PATH/$DEFCONFIG_NAME
+    echo "Kernel Config Build Costed $(($COST_SEC/60))min $(($COST_SEC%60))s"
+
+}
+
+clean(){
+    echo "Clean source tree and build files..."
+    make mrproper -j$THREAD;
+    make clean -j$THREAD;
+    rm -rf $OUT;
+}
+
+main(){
+    if [ $1 == "help" -o $1 == "-h" ]
+    then
+        echo "build.sh: A very simple Kernel build helper"
+        echo "usage: build.sh <build option>"
+        echo
+        echo "Build options:"
+        echo "    all             Perform a build without cleaning."
+        echo "    cleanbuild      Clean the source tree and build files then perform a all build."
+        echo
+        echo "    flashable       Only generate the flashable zip file. Don't use it before you have built once."
+        echo "    savedefconfig   Save the defconfig file to source tree."
+        echo "    defconfig       Only build kernel defconfig"
+        echo "    help ( -h )     Print help information."
+        echo "    version         Display the version number."
+        echo
+    elif [ $1 == "savedefconfig" ]
+    then
+        save_defconfig;
+    elif [ $1 == "cleanbuild" ]
+    then
+        clean;
+        make_defconfig;
+        build_kernel;
+        link_all_dtb_files;
+        generate_flashable;
+    elif [ $1 == "flashable" ]
+    then
+        generate_flashable;
+    elif [ $1 == "kernelonly" ]
+    then
+        make_defconfig
+        build_kernel
+    elif [ $1 == "all" ]
+    then
+        make_defconfig
+        build_kernel
+        link_all_dtb_files
+        generate_flashable
+    elif [ $1 == "defconfig" ]
+    then
+        make_defconfig;
+    elif [ $1 == "version" ] 
+    then 
+        echo "Current version is: $LOCAL_VERSION_NUMBER"
+    else
+        echo "Incorrect usage. Please run: "
+        echo "  bash build.sh help (or -h) "
+        echo "to display help message."
+    fi
+}
+
+main "$1";
