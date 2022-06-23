@@ -2,6 +2,7 @@
  * x_tables core - Backend for {ip,ip6,arp}_tables
  *
  * Copyright (C) 2006-2006 Harald Welte <laforge@netfilter.org>
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Copyright (C) 2006-2012 Patrick McHardy <kaber@trash.net>
  *
  * Based on existing ip_tables code which is
@@ -1357,7 +1358,6 @@ xt_replace_table(struct xt_table *table,
 	      int *error)
 {
 	struct xt_table_info *private;
-	unsigned int cpu;
 	int ret;
 
 	ret = xt_jumpstack_alloc(newinfo);
@@ -1392,22 +1392,11 @@ xt_replace_table(struct xt_table *table,
 
 	/*
 	 * Even though table entries have now been swapped, other CPU's
-	 * may still be using the old entries...
+	 * may still be using the old entries. This is okay, because
+	 * resynchronization happens because of the locking done
+	 * during the get_counters() routine.
 	 */
 	local_bh_enable();
-
-	/* ... so wait for even xt_recseq on all cpus */
-	for_each_possible_cpu(cpu) {
-		seqcount_t *s = &per_cpu(xt_recseq, cpu);
-		u32 seq = raw_read_seqcount(s);
-
-		if (seq & 1) {
-			do {
-				cond_resched();
-				cpu_relax();
-			} while (seq == raw_read_seqcount(s));
-		}
-	}
 
 #ifdef CONFIG_AUDIT
 	if (audit_enabled) {
