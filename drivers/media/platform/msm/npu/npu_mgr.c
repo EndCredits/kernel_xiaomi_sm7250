@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 /* -------------------------------------------------------------------------
@@ -76,6 +77,7 @@ static struct npu_network_cmd *npu_alloc_network_cmd(struct npu_host_ctx *ctx,
 	uint32_t stats_buf_size);
 static void npu_free_network_cmd(struct npu_host_ctx *ctx,
 	struct npu_network_cmd *cmd);
+struct wakeup_source *ws = NULL;
 static struct npu_misc_cmd *npu_alloc_misc_cmd(struct npu_host_ctx *ctx);
 static void npu_free_misc_cmd(struct npu_host_ctx *ctx,
 	struct npu_misc_cmd *cmd);
@@ -888,6 +890,7 @@ int npu_host_init(struct npu_device *npu_dev)
 	host_ctx->auto_pil_disable = false;
 	host_ctx->fw_caps_valid = false;
 	host_ctx->fw_caps_err_code = 0;
+	ws = wakeup_source_register(npu_dev->device, "npu-ws");
 
 	return 0;
 
@@ -912,6 +915,8 @@ void npu_host_deinit(struct npu_device *npu_dev)
 {
 	struct npu_host_ctx *host_ctx = &npu_dev->host_ctx;
 
+	wakeup_source_unregister(ws);
+	ws = NULL;
 	kfree(host_ctx->ipc_msg_buf);
 	kmem_cache_destroy(host_ctx->stats_buf_cache);
 	kmem_cache_destroy(host_ctx->network_cmd_cache);
@@ -1184,6 +1189,7 @@ static void npu_disable_fw_work(struct work_struct *work)
 		disable_fw_nolock(npu_dev);
 		host_ctx->bridge_mbox_pwr_on = false;
 	}
+	__pm_relax(ws);
 	mutex_unlock(&host_ctx->lock);
 	NPU_DBG("Exit disable fw work\n");
 }
@@ -1224,6 +1230,7 @@ static void npu_bridge_mbox_work(struct work_struct *work)
 		return;
 	}
 
+	__pm_stay_awake(ws);
 	/* queue or modify delayed work to disable fw */
 	mod_delayed_work(host_ctx->wq, &host_ctx->disable_fw_work,
 		NPU_MBOX_IDLE_TIMEOUT);
