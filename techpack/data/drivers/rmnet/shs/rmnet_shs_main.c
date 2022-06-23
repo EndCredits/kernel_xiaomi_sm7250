@@ -1,4 +1,6 @@
 /* Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -911,7 +913,6 @@ int rmnet_shs_node_can_flush_pkts(struct rmnet_shs_skbn_s *node, u8 force_flush)
 				cpun = &rmnet_shs_cpu_node_tbl[node->map_cpu];
 				rmnet_shs_update_cpu_proc_q_all_cpus();
 				node->queue_head = cpun->qhead;
-
 				rmnet_shs_cpu_node_move(node,
 							&cpun->node_list_id,
 							cpu_num);
@@ -1771,7 +1772,6 @@ void rmnet_shs_assign(struct sk_buff *skb, struct rmnet_port *port)
 
 	/*deliver non TCP/UDP packets right away*/
 	if (!rmnet_shs_is_skb_stamping_reqd(skb)) {
-
 		rmnet_shs_deliver_skb(skb);
 		return;
 	}

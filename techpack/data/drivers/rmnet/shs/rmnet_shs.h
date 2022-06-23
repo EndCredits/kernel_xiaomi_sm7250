@@ -107,7 +107,6 @@ struct rmnet_shs_cfg_s {
 	u8 map_mask;
 	u8 map_len;
 	u8 ff_flag;
-
 };
 
 struct rmnet_shs_skb_list {
