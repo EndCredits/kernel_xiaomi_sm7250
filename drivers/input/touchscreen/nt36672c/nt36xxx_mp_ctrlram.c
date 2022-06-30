@@ -1684,14 +1684,7 @@ static int32_t nvt_selftest_open(struct inode *inode, struct file *file)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	//---Download MP FW---
-	if (nvt_get_dbgfw_status()) {
-		if (nvt_update_firmware(DEFAULT_DEBUG_MP_NAME) < 0) {
-			NVT_ERR("use built-in fw");
-			nvt_update_firmware(ts->mp_name);
-		}
-	} else {
-		nvt_update_firmware(ts->mp_name);
-	}
+	nvt_update_firmware(ts->mp_name);
 
 	if (nvt_get_fw_info()) {
 		mutex_unlock(&ts->lock);
@@ -1828,14 +1821,7 @@ static int32_t nvt_selftest_open(struct inode *inode, struct file *file)
 	}
 
 	//---Download Normal FW---
-	if (nvt_get_dbgfw_status()) {
-		if (nvt_update_firmware(DEFAULT_DEBUG_FW_NAME) < 0) {
-			NVT_ERR("use built-in fw");
-			nvt_update_firmware(ts->fw_name);
-		}
-	} else {
-		nvt_update_firmware(ts->fw_name);
-	}
+	nvt_update_firmware(ts->fw_name);
 
 	mutex_unlock(&ts->lock);
 
@@ -2092,14 +2078,7 @@ static int nvt_short_test(void)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	//---Download MP FW---
-	if (nvt_get_dbgfw_status()) {
-		if (nvt_update_firmware(DEFAULT_DEBUG_MP_NAME) < 0) {
-			NVT_ERR("use built-in fw");
-			nvt_update_firmware(ts->mp_name);
-		}
-	} else {
-		nvt_update_firmware(ts->mp_name);
-	}
+	nvt_update_firmware(ts->mp_name);
 
 	if (nvt_get_fw_info()) {
 		mutex_unlock(&ts->lock);
@@ -2128,14 +2107,8 @@ static int nvt_short_test(void)
 
 			if (nvt_mp_parse_dt(np, mpcriteria)) {
 				//---Download Normal FW---
-				if (nvt_get_dbgfw_status()) {
-					if (nvt_update_firmware(DEFAULT_DEBUG_FW_NAME) < 0) {
-						NVT_ERR("use built-in fw");
-						nvt_update_firmware(ts->fw_name);
-					}
-				} else {
-					nvt_update_firmware(ts->fw_name);
-				}
+				nvt_update_firmware(ts->fw_name);
+
 				mutex_unlock(&ts->lock);
 				NVT_ERR("mp parse device tree failed!\n");
 				return -EINVAL;
@@ -2175,14 +2148,7 @@ static int nvt_short_test(void)
 	}
 
 	//---Download Normal FW---
-	if (nvt_get_dbgfw_status()) {
-		if (nvt_update_firmware(DEFAULT_DEBUG_FW_NAME) < 0) {
-			NVT_ERR("use built-in fw");
-			nvt_update_firmware(ts->fw_name);
-		}
-	} else {
-		nvt_update_firmware(ts->fw_name);
-	}
+	nvt_update_firmware(ts->fw_name);
 
 	mutex_unlock(&ts->lock);
 
@@ -2213,15 +2179,7 @@ static int nvt_open_test(void)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	//---Download MP FW---
-	if (nvt_get_dbgfw_status()) {
-		if (nvt_update_firmware(DEFAULT_DEBUG_MP_NAME) < 0) {
-			NVT_ERR("use built-in fw");
-			nvt_update_firmware(ts->mp_name);
-		}
-	} else {
-		nvt_update_firmware(ts->mp_name);
-	}
-
+	nvt_update_firmware(ts->mp_name);
 
 	if (nvt_get_fw_info()) {
 		mutex_unlock(&ts->lock);
@@ -2250,14 +2208,8 @@ static int nvt_open_test(void)
 
 			if (nvt_mp_parse_dt(np, mpcriteria)) {
 				//---Download Normal FW---
-				if (nvt_get_dbgfw_status()) {
-					if (nvt_update_firmware(DEFAULT_DEBUG_FW_NAME) < 0) {
-						NVT_ERR("use built-in fw");
-						nvt_update_firmware(ts->fw_name);
-					}
-				} else {
-					nvt_update_firmware(ts->fw_name);
-				}
+				nvt_update_firmware(ts->fw_name);
+
 				mutex_unlock(&ts->lock);
 				NVT_ERR("mp parse device tree failed!\n");
 				return -EINVAL;
@@ -2297,14 +2249,7 @@ static int nvt_open_test(void)
 	}
 
 	//---Download Normal FW---
-	if (nvt_get_dbgfw_status()) {
-		if (nvt_update_firmware(DEFAULT_DEBUG_FW_NAME) < 0) {
-			NVT_ERR("use built-in fw");
-			nvt_update_firmware(ts->fw_name);
-		}
-	} else {
-		nvt_update_firmware(ts->fw_name);
-	}
+	nvt_update_firmware(ts->fw_name);
 
 	mutex_unlock(&ts->lock);
 

@@ -76,11 +76,15 @@ extern void nvt_mp_proc_deinit(void);
 
 struct nvt_ts_data *ts;
 
+void nvt_ts_refresh(struct work_struct *work);
+
 #if BOOT_UPDATE_FIRMWARE
 static struct workqueue_struct *nvt_fwu_wq;
 static struct workqueue_struct *nvt_lockdown_wq;
 extern void Boot_Update_Firmware(struct work_struct *work);
 #endif
+
+static struct workqueue_struct *nvt_refresh_wq;
 
 #ifdef MI_DRM_NOTIFIER
 static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
@@ -96,6 +100,8 @@ static int32_t nvt_ts_resume(struct device *dev);
 extern int dsi_panel_lockdown_info_read(unsigned char *plockdowninfo);
 extern void dsi_panel_doubleclick_enable(bool on);
 static int32_t nvt_check_palm(uint8_t input_id, uint8_t *data);
+extern void touch_irq_boost(void);
+extern void lpm_disable_for_input(bool on);
 uint32_t ENG_RST_ADDR  = 0x7FFF80;
 uint32_t SWRST_N8_ADDR = 0; //read from dtsi
 uint32_t SPI_RD_FAST_ADDR = 0;	//read from dtsi
@@ -1326,16 +1332,6 @@ static void nvt_gpio_deconfig(struct nvt_ts_data *ts)
 #endif
 }
 
-void nvt_set_dbgfw_status(bool enable)
-{
-	ts->fw_debug = enable;
-}
-
-bool nvt_get_dbgfw_status(void)
-{
-	return ts->fw_debug;
-}
-
 #if NVT_TOUCH_ESD_PROTECT
 void nvt_esd_check_enable(uint8_t enable)
 {
@@ -1373,14 +1369,8 @@ static void nvt_esd_check_func(struct work_struct *work)
 		mutex_lock(&ts->lock);
 		NVT_ERR("do ESD recovery, timer = %d, retry = %d\n", timer, esd_retry);
 		/* do esd recovery, reload fw */
-		if (nvt_get_dbgfw_status()) {
-			if (nvt_update_firmware(DEFAULT_DEBUG_FW_NAME) < 0) {
-				NVT_ERR("use built-in fw");
-				nvt_update_firmware(ts->fw_name);
-			}
-		} else {
-			nvt_update_firmware(ts->fw_name);
-		}
+		nvt_update_firmware(ts->fw_name);
+
 		mutex_unlock(&ts->lock);
 		/* update interrupt timer */
 		irq_timer = jiffies;
@@ -1447,11 +1437,17 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		pm_wakeup_event(&ts->input_dev->dev, 5000);
 	}
 #endif
+	if (ts->debug_flag == TOUCH_IRQ_BOOST)
+		touch_irq_boost();
 	mutex_lock(&ts->lock);
+	if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+		lpm_disable_for_input(true);
 	if (ts->dev_pm_suspend) {
 		ret = wait_for_completion_timeout(&ts->dev_pm_suspend_completion, msecs_to_jiffies(500));
 		if (!ret) {
 			NVT_ERR("system(spi) can't finished resuming procedure, skip it\n");
+			if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+				lpm_disable_for_input(false);
 			goto XFER_ERROR;
 		}
 	}
@@ -1459,6 +1455,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + 1);
 	if (ret < 0) {
 		NVT_ERR("CTP_SPI_READ failed.(%d)\n", ret);
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR;
 	}
 /*
@@ -1474,14 +1472,10 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
    /* ESD protect by WDT */
 	if (nvt_wdt_fw_recovery(point_data)) {
 		NVT_ERR("Recover for fw reset, %02X\n", point_data[1]);
-		if (nvt_get_dbgfw_status()) {
-			if (nvt_update_firmware(DEFAULT_DEBUG_FW_NAME) < 0) {
-				NVT_ERR("use built-in fw");
-				nvt_update_firmware(ts->fw_name);
-			}
-		} else {
-			nvt_update_firmware(ts->fw_name);
-		}
+		nvt_update_firmware(ts->fw_name);
+
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR;
    }
 #endif /* #if NVT_TOUCH_WDT_RECOVERY */
@@ -1490,6 +1484,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	/* ESD protect by FW handshake */
 	if (nvt_fw_recovery(point_data)) {
 		nvt_esd_check_enable(true);
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR;
 	}
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
@@ -1498,6 +1494,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	input_id = (uint8_t)(point_data[1] >> 3);
 
 	if (nvt_check_palm(input_id, point_data)) {
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR; /* to skip point data parsing */
 	}
 #endif
@@ -1506,6 +1504,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	if (bTouchIsAwake == 0) {
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		mutex_unlock(&ts->lock);
 		return IRQ_HANDLED;
 	}
@@ -1563,6 +1563,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			if (finger_cnt == 0 && test_bit(i, ts->slot_map)) {
 				input_report_key(ts->input_dev, BTN_TOUCH, 0);
 				input_report_key(ts->input_dev, BTN_TOOL_FINGER, 0);
+				if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+					lpm_disable_for_input(false);
 			}
 			clear_bit(i, ts->slot_map);
 		}
@@ -2202,162 +2204,6 @@ static int nvt_reset_mode(int mode)
 }
 #endif
 
-#ifdef CONFIG_TOUCHSCREEN_NVT_DEBUG_FS
-
-static void tpdbg_shutdown(struct nvt_ts_data *ts_core, bool enable)
-{
-	mutex_lock(&ts->lock);
-	if (enable) {
-		if (nvt_write_addr(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD, 0x1A) < 0) {
-			NVT_ERR("disable tp sensor failed!");
-		}
-	} else {
-		if (nvt_write_addr(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD, 0x15) < 0) {
-			NVT_ERR("enable tp sensor failed!");
-		}
-	}
-	mutex_unlock(&ts->lock);
-}
-
-static void tpdbg_suspend(struct nvt_ts_data *ts_core, bool enable)
-{
-	if (enable)
-		nvt_ts_suspend(&ts_core->client->dev);
-	else
-		nvt_ts_resume(&ts_core->client->dev);
-}
-
-static int tpdbg_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-
-	return 0;
-}
-
-static ssize_t tpdbg_read(struct file *file, char __user *buf, size_t size,
-			  loff_t *ppos)
-{
-	const char *str = "cmd support as below:\n \
-				echo \"irq-disable\" or \"irq-enable\" to ctrl irq\n \
-				echo \"tp-sd-en\" or \"tp-sd-off\" to ctrl panel on or off sensor\n \
-				echo \"tp-suspend-en\" or \"tp-suspend-off\" to ctrl panel in or off suspend status\n \
-				echo \"fw-debug-on\" or \"fw-debug-off\" to on or off fw debug function\n";
-
-	loff_t pos = *ppos;
-	int len = strlen(str);
-
-	if (pos < 0)
-		return -EINVAL;
-	if (pos >= len)
-		return 0;
-
-	if (copy_to_user(buf, str, len))
-		return -EFAULT;
-
-	*ppos = pos + len;
-
-	return len;
-}
-
-static ssize_t tpdbg_write(struct file *file, const char __user *buf,
-			   size_t size, loff_t *ppos)
-{
-	struct nvt_ts_data *ts_core = file->private_data;
-	char *cmd = kzalloc(size + 1, GFP_KERNEL);
-	int ret = size;
-
-	if (!cmd)
-		return -ENOMEM;
-
-	if (copy_from_user(cmd, buf, size)) {
-		ret = -EFAULT;
-		goto out;
-	}
-
-#if NVT_TOUCH_ESD_PROTECT
-	cancel_delayed_work_sync(&nvt_esd_check_work);
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
-
-	cmd[size] = '\0';
-
-	if (!strncmp(cmd, "irq-disable", 11))
-		nvt_irq_enable(false);
-	else if (!strncmp(cmd, "irq-enable", 10))
-		nvt_irq_enable(true);
-	else if (!strncmp(cmd, "tp-sd-en", 8))
-		tpdbg_shutdown(ts_core, true);
-	else if (!strncmp(cmd, "tp-sd-off", 9))
-		tpdbg_shutdown(ts_core, false);
-	else if (!strncmp(cmd, "tp-suspend-en", 13))
-		tpdbg_suspend(ts_core, true);
-	else if (!strncmp(cmd, "tp-suspend-off", 14))
-		tpdbg_suspend(ts_core, false);
-	else if (!strncmp(cmd, "fw-debug-on", 11))
-		nvt_set_dbgfw_status(true);
-	else if (!strncmp(cmd, "fw-debug-off", 12))
-		nvt_set_dbgfw_status(false);
-out:
-	kfree(cmd);
-
-	return ret;
-}
-
-static int tpdbg_release(struct inode *inode, struct file *file)
-{
-	file->private_data = NULL;
-
-	return 0;
-}
-
-static ssize_t  nvt_touch_test_write(struct file *file, const char __user *buf,
-		size_t count, loff_t *pos){
-	int retval = -1;
-	uint8_t cmd[8];
-	if (copy_from_user(cmd, buf, count)) {
-		retval = -EFAULT;
-		goto out;
-	}
-	switch(cmd[0]) {
-		case '0':
-			ts->debug_flag = 0;
-			break;
-		case '1':
-			ts->debug_flag = 1;
-			break;
-		case '2':
-			ts->debug_flag = 2;
-			break;
-		default:
-			NVT_LOG("%s invalid input cmd, set default value\n", __func__);
-			ts->debug_flag = 2;
-	}
-	NVT_LOG("%s set touch boost debug flag to %d\n", __func__, ts->debug_flag);
-	retval = count;
-out:
-	return retval;
-}
-
-static const struct file_operations nvt_touch_test_fops = {
-	.owner = THIS_MODULE,
-	.write = nvt_touch_test_write,
-};
-
-static const struct file_operations tpdbg_ops = {
-	.owner = THIS_MODULE,
-	.open = tpdbg_open,
-	.read = tpdbg_read,
-	.write = tpdbg_write,
-	.release = tpdbg_release,
-};
-#endif
-/*
-static void nvt_suspend_work(struct work_struct *work)
-{
-	struct nvt_ts_data *ts_core = container_of(work, struct nvt_ts_data, suspend_work);
-	nvt_ts_suspend(&ts_core->client->dev);
-}
-*/
 static void nvt_resume_work(struct work_struct *work)
 {
 	struct nvt_ts_data *ts_core = container_of(work, struct nvt_ts_data, resume_work);
@@ -2406,6 +2252,8 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	NVT_LOG("start\n");
 
 	ts = kzalloc(sizeof(struct nvt_ts_data), GFP_KERNEL);
+
+	ts->avoid_notifier_callback = true;
 	if (ts == NULL) {
 		NVT_ERR("failed to allocated memory for nvt ts data\n");
 		return -ENOMEM;
@@ -2653,6 +2501,10 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	queue_delayed_work(nvt_fwu_wq, &ts->nvt_fwu_work, msecs_to_jiffies(14000));
 #endif
 
+	nvt_refresh_wq = alloc_workqueue("nvt_refresh_wq", WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
+	INIT_DELAYED_WORK(&ts->nvt_refresh_work, nvt_ts_refresh);
+	queue_delayed_work(nvt_refresh_wq, &ts->nvt_refresh_work, msecs_to_jiffies(32000));
+
 	NVT_LOG("NVT_TOUCH_ESD_PROTECT is %d\n", NVT_TOUCH_ESD_PROTECT);
 #if NVT_TOUCH_ESD_PROTECT
 	INIT_DELAYED_WORK(&nvt_esd_check_work, nvt_esd_check_func);
@@ -2745,13 +2597,6 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	}
 #endif
 
-#ifdef CONFIG_TOUCHSCREEN_NVT_DEBUG_FS
-	ts->debugfs = debugfs_create_dir("tp_debug", NULL);
-	if (ts->debugfs) {
-		debugfs_create_file("switch_state", 0660, ts->debugfs, ts, &tpdbg_ops);
-		debugfs_create_file("touch_boost", 0660, ts->debugfs, ts, &nvt_touch_test_fops);
-	}
-#endif
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
 			xiaomi_touch_interfaces.touch_vendor_read = nvt_touch_vendor_read;
 			xiaomi_touch_interfaces.panel_display_read = nvt_panel_display_read;
@@ -3106,11 +2951,8 @@ static int32_t nvt_ts_resume(struct device *dev)
 		NVT_LOG("Touch is already resume\n");
 #if NVT_TOUCH_WDT_RECOVERY
 		mutex_lock(&ts->lock);
-		if (nvt_get_dbgfw_status()) {
-			ret = nvt_update_firmware(DEFAULT_DEBUG_FW_NAME);
-		} else {
-			ret = nvt_update_firmware(ts->fw_name);
-		}
+		ret = nvt_update_firmware(ts->fw_name);
+
 		mutex_unlock(&ts->lock);
 #endif /* #if NVT_TOUCH_WDT_RECOVERY */
 		goto Exit;
@@ -3125,15 +2967,8 @@ static int32_t nvt_ts_resume(struct device *dev)
 #if NVT_TOUCH_SUPPORT_HW_RST
 	gpio_set_value(ts->reset_gpio, 1);
 #endif
-	if (nvt_get_dbgfw_status()) {
-		ret = nvt_update_firmware(DEFAULT_DEBUG_FW_NAME);
-		if (ret < 0) {
-			NVT_ERR("use built-in fw");
-			ret = nvt_update_firmware(ts->fw_name);
-		}
-	} else {
-		ret = nvt_update_firmware(ts->fw_name);
-	}
+	ret = nvt_update_firmware(ts->fw_name);
+
 	if (ret)
 		NVT_ERR("download firmware failed\n");
 	nvt_check_fw_reset_state(RESET_STATE_REK);
@@ -3180,6 +3015,14 @@ Exit:
 	return 0;
 }
 
+void nvt_ts_refresh(struct work_struct *work)
+{
+	flush_workqueue(ts->event_wq);
+	nvt_ts_suspend(&ts->client->dev);
+	msleep(100);
+	flush_workqueue(ts->event_wq);
+	queue_work(ts->event_wq, &ts->resume_work);
+}
 
 #ifdef MI_DRM_NOTIFIER
 static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
@@ -3188,6 +3031,9 @@ static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long 
 	int *blank;
 	struct nvt_ts_data *ts_data=
 		container_of(self, struct nvt_ts_data, drm_notif);
+
+	if (ts_data->avoid_notifier_callback)
+		return 0;
 
 	if (!evdata || (evdata->id != 0))
 		return 0;

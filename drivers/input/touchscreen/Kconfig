@@ -1335,10 +1335,21 @@ config TOUCHSCREEN_ST
 
 source "drivers/input/touchscreen/st/Kconfig"
 
+config TOUCHSCREEN_ST_FTS_V521
+	tristate "STMicroelectronics Touchscreen Driver"
+	depends on I2C
+	default y
+	help
+	  Say Y here if you have a STMicroelectronics Touchscreen.
+
+	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called fts_521.
+
 config TOUCHSCREEN_SYNAPTICS_DSX
 	bool "Synaptics DSX Touchscreen Driver"
 	depends on I2C
-	default n
+	default y
 	help
 	  Say Y here if you have a Synaptics Touchscreen.
 
@@ -1349,6 +1360,28 @@ config TOUCHSCREEN_SYNAPTICS_DSX
 
 source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
 
+config I2C_STATUS_FOR_TOUCH
+	bool "I2C Status for touch"
+	help
+		Say Y here if you use touch driver detect system i2c status when exit suspend state.
+		If unsure, say N.
+
+source "drivers/input/touchscreen/focaltech_touch/Kconfig"
+source "drivers/input/touchscreen/focaltouch/Kconfig"
+
+config TOUCHSCREEN_SYNAPTICS_TCM
+        bool "Synaptics TCM Touchscreen Driver"
+        depends on I2C
+        default y
+        help
+          Say Y here if you have a Synaptics Touchscreen.
+
+          If unsure, say N.
+
+          To compile this driver as a module, choose M here: the
+          module will be called synaptics_tcm.
+
+source "drivers/input/touchscreen/synaptics_tcm/Kconfig"
 source "drivers/input/touchscreen/nt36xxx/Kconfig"
 
 config TOUCHSCREEN_COMMON

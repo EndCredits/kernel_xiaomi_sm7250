@@ -53,6 +53,7 @@
 
 #define NVT_DEBUG 1
 #define TOUCH_DISABLE_LPM 1
+#define TOUCH_IRQ_BOOST 2
 
 //---GPIO number---
 #define NVTTOUCH_RST_PIN 980
@@ -109,8 +110,6 @@ extern const uint16_t gesture_key_array[];
 #define BOOT_UPDATE_FIRMWARE 1
 #define DEFAULT_BOOT_UPDATE_FIRMWARE_NAME "novatek_ts_fw.bin"
 #define DEFAULT_MP_UPDATE_FIRMWARE_NAME   "novatek_ts_mp.bin"
-#define DEFAULT_DEBUG_FW_NAME "novatek_debug_fw.bin"
-#define DEFAULT_DEBUG_MP_NAME "novatek_debug_mp.bin"
 
 
 //---ESD Protect.---
@@ -203,10 +202,6 @@ struct nvt_ts_data {
 	struct attribute_group *attrs;
 	/*bit map indicate which slot(0~9) has been used*/
 	unsigned long slot_map[BITS_TO_LONGS(10)];
-	bool fw_debug;
-#ifdef CONFIG_TOUCHSCREEN_NVT_DEBUG_FS
-	struct dentry *debugfs;
-#endif
 	struct workqueue_struct *event_wq;
 	struct work_struct suspend_work;
 	struct work_struct resume_work;
@@ -219,6 +214,9 @@ struct nvt_ts_data {
 	bool palm_sensor_switch;
 	bool rf_resist_cmd_waiting;
 	uint8_t debug_flag;
+
+	bool avoid_notifier_callback;
+	struct delayed_work nvt_refresh_work;
 };
 
 #if NVT_TOUCH_PROC
@@ -277,8 +275,6 @@ int32_t nvt_clear_fw_status(void);
 int32_t nvt_check_fw_status(void);
 int32_t nvt_set_page(uint32_t addr);
 int32_t nvt_write_addr(uint32_t addr, uint8_t data);
-void nvt_set_dbgfw_status(bool enable);
-bool nvt_get_dbgfw_status(void);
 void nvt_match_fw(void);
 int32_t nvt_set_pocket_palm_switch(uint8_t pocket_palm_switch);
 #if NVT_TOUCH_ESD_PROTECT

@@ -29,8 +29,6 @@
 #define NVT_BASELINE "nvt_baseline"
 #define NVT_RAW "nvt_raw"
 #define NVT_DIFF "nvt_diff"
-#define NVT_XIAOMI_CONFIG_INFO "nvt_xiaomi_config_info"
-#define NVT_XIAOMI_LOCKDOWN_INFO "tp_lockdown_info"
 
 
 #define SPI_TANSFER_LENGTH  256
@@ -49,14 +47,8 @@ static struct proc_dir_entry *NVT_proc_fw_version_entry;
 static struct proc_dir_entry *NVT_proc_baseline_entry;
 static struct proc_dir_entry *NVT_proc_raw_entry;
 static struct proc_dir_entry *NVT_proc_diff_entry;
-static struct proc_dir_entry *NVT_proc_xiaomi_config_info_entry;
-static struct proc_dir_entry *NVT_proc_xiaomi_lockdown_info_entry;
 
 
-// Xiaomi Config Info.
-static uint8_t nvt_xiaomi_conf_info_fw_ver = 0;
-static uint8_t nvt_xiaomi_conf_info_fae_id = 0;
-static uint64_t nvt_xiaomi_conf_info_reservation = 0;
 
 /*******************************************************
 Description:
@@ -523,79 +515,6 @@ static const struct file_operations nvt_diff_fops = {
 	.release = seq_release,
 };
 
-static int nvt_xiaomi_config_info_show(struct seq_file *m, void *v)
-{
-	seq_printf(m, "FW version/Config version, Debug version: 0x%02X\n", nvt_xiaomi_conf_info_fw_ver);
-	seq_printf(m, "FAE ID: 0x%02X\n", nvt_xiaomi_conf_info_fae_id);
-	seq_printf(m, "Reservation byte: 0x%012llX\n", nvt_xiaomi_conf_info_reservation);
-
-	return 0;
-}
-
-static int32_t nvt_xiaomi_config_info_open(struct inode *inode, struct file *file)
-{
-	uint8_t buf[16] = {0};
-
-	if (mutex_lock_interruptible(&ts->lock)) {
-		return -ERESTARTSYS;
-	}
-
-	NVT_LOG("++\n");
-
-#if NVT_TOUCH_ESD_PROTECT
-	nvt_esd_check_enable(false);
-#endif /* #if NVT_TOUCH_ESD_PROTECT */
-
-	//---set xdata index to EVENT BUF ADDR---
-	nvt_set_page(ts->mmap->EVENT_BUF_ADDR | 0x9C);
-
-	buf[0] = 0x9C;
-	CTP_SPI_READ(ts->client, buf, 9);
-
-	nvt_xiaomi_conf_info_fw_ver = buf[1];
-	nvt_xiaomi_conf_info_fae_id = buf[2];
-	nvt_xiaomi_conf_info_reservation = (((uint64_t)buf[3] << 40) | ((uint64_t)buf[4] << 32) | ((uint64_t)buf[5] << 24) | ((uint64_t)buf[6] << 16) | ((uint64_t)buf[7] << 8) | (uint64_t)buf[8]);
-
-	mutex_unlock(&ts->lock);
-
-	NVT_LOG("--\n");
-
-	return single_open(file, nvt_xiaomi_config_info_show, NULL);
-}
-
-static const struct file_operations nvt_xiaomi_config_info_fops = {
-	.owner = THIS_MODULE,
-	.open = nvt_xiaomi_config_info_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-
-static int nvt_xiaomi_lockdown_info_show(struct seq_file *m, void *v)
-{
-	u8 *lk = ts->lockdown_info;
-
-	seq_printf(m, "0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n",
-					lk[0], lk[1], lk[2], lk[3], lk[4], lk[5], lk[6], lk[7]);
-	return 0;
-}
-
-
-
-static int32_t nvt_xiaomi_lockdown_info_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, nvt_xiaomi_lockdown_info_show, NULL);
-}
-
-
-static const struct file_operations nvt_xiaomi_lockdown_info_fops = {
-	.owner = THIS_MODULE,
-	.open = nvt_xiaomi_lockdown_info_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-
 int32_t nvt_set_pocket_palm_switch(uint8_t pocket_palm_switch)
 {
 	uint8_t buf[8] = {0};
@@ -679,22 +598,6 @@ int32_t nvt_extra_proc_init(void)
 		NVT_LOG("create proc/%s Succeeded!\n", NVT_DIFF);
 	}
 
-	NVT_proc_xiaomi_config_info_entry = proc_create(NVT_XIAOMI_CONFIG_INFO, 0444, NULL, &nvt_xiaomi_config_info_fops);
-	if (NVT_proc_xiaomi_config_info_entry == NULL) {
-		NVT_ERR("create proc/%s Failed!\n", NVT_XIAOMI_CONFIG_INFO);
-		return -ENOMEM;
-	} else {
-		NVT_LOG("create proc/%s Succeeded!\n", NVT_XIAOMI_CONFIG_INFO);
-	}
-
-	NVT_proc_xiaomi_lockdown_info_entry = proc_create(NVT_XIAOMI_LOCKDOWN_INFO, 0444, NULL, &nvt_xiaomi_lockdown_info_fops);
-	if (NVT_proc_xiaomi_lockdown_info_entry == NULL) {
-		NVT_ERR("create proc/%s Failed!\n", NVT_XIAOMI_LOCKDOWN_INFO);
-		return -ENOMEM;
-	} else {
-		NVT_LOG("create proc/%s Succeeded!\n", NVT_XIAOMI_LOCKDOWN_INFO);
-	}
-
 	return 0;
 }
 
@@ -730,12 +633,6 @@ void nvt_extra_proc_deinit(void)
 		remove_proc_entry(NVT_DIFF, NULL);
 		NVT_proc_diff_entry = NULL;
 		NVT_LOG("Removed /proc/%s\n", NVT_DIFF);
-	}
-
-	if (NVT_proc_xiaomi_config_info_entry != NULL) {
-		remove_proc_entry(NVT_XIAOMI_CONFIG_INFO, NULL);
-		NVT_proc_xiaomi_config_info_entry = NULL;
-		NVT_LOG("Removed /proc/%s\n", NVT_XIAOMI_CONFIG_INFO);
 	}
 }
 #endif
