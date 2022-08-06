@@ -321,6 +321,7 @@
 	qcom,shutdown-soc-threshold = <3>;
 	qcom,tcss-enable;
 	qcom,shutdown-delay-enable;
+	qcom,bass-enable;
 };
 
 &smb1396 {
