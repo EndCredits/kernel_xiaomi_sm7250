@@ -310,7 +310,7 @@ static int lz4_decompress_pages(struct decompress_io_ctx *dic)
 						dic->clen, dic->rlen, false);
 #else
 	ret = LZ4_decompress_safe(dic->cbuf->cdata, dic->rbuf,
-						dic->clen, dic->rlen);
+						dic->clen, dic->rlen, false);
 #endif
 
 	if (ret < 0) {
