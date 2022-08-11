@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (C) 2008 Google, Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Copyright (C) 2008 HTC Corporation
  * Copyright (c) 2009-2020, The Linux Foundation. All rights reserved.
  *
