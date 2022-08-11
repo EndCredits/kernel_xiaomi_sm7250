@@ -389,9 +389,6 @@ static int va_macro_swr_pwr_event_v2(struct snd_soc_dapm_widget *w,
 	dev_dbg(va_dev, "%s: event = %d, lpi_enable = %d\n",
 		__func__, event, va_priv->lpi_enable);
 
-	if (!va_priv->lpi_enable)
-		return ret;
-
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		if (va_priv->swr_ctrl_data) {
@@ -441,9 +438,6 @@ static int va_macro_swr_pwr_event(struct snd_soc_dapm_widget *w,
 
 	dev_dbg(va_dev, "%s: event = %d, lpi_enable = %d\n",
 		__func__, event, va_priv->lpi_enable);
-
-	if (!va_priv->lpi_enable)
-		return ret;
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
