@@ -111,3 +111,5 @@ wcd938x_dlkm-y := $(WCD938X_OBJS)
 
 obj-$(CONFIG_SND_SOC_WCD938X_SLAVE) += wcd938x_slave_dlkm.o
 wcd938x_slave_dlkm-y := $(WCD938X_SLAVE_OBJS)
+
+

@@ -102,3 +102,5 @@ endif
 # Module information used by KBuild framework
 obj-$(CONFIG_SND_SOC_WSA883X) += wsa883x_dlkm.o
 wsa883x_dlkm-y := $(WSA883X_OBJS)
+
+

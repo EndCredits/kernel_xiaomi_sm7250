@@ -100,3 +100,5 @@ endif
 # Module information used by KBuild framework
 obj-$(CONFIG_SND_SOC_CSRA66X0) += csra66x0_dlkm.o
 csra66x0_dlkm-y := $(CSRA66X0_OBJS)
+
+

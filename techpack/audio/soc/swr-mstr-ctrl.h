@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2021 XiaoMi, Inc.
  */
 
@@ -52,6 +52,7 @@ enum {
 	SWR_MSTR_UP,
 	SWR_MSTR_DOWN,
 	SWR_MSTR_SSR,
+	SWR_MSTR_SSR_RESET,
 };
 
 enum swrm_pm_state {
@@ -186,6 +187,7 @@ struct swr_mstr_ctrl {
 	u32 rd_fifo_depth;
 	u32 wr_fifo_depth;
 	bool enable_slave_irq;
+	bool clk_stop_wakeup;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_swrm_dent;
 	struct dentry *debugfs_peek;

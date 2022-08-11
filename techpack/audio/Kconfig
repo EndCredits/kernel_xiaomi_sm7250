@@ -1,3 +1,5 @@
+menu "Qualcomm Inc. techpack audio support"
+
 config PINCTRL_LPI
         tristate "PINCTRL_LPI"
 config AUDIO_EXT_CLK
@@ -91,3 +93,4 @@ config TDM_DISABLE
 config AUXPCM_DISABLE
 	tristate "AUXPCM_DISABLE"
 
+endmenu
