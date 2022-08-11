@@ -3,7 +3,6 @@
 * Copyright (C) 2021 XiaoMi, Inc.
 *
 */
-/* #define DEBUG */
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -82,12 +81,12 @@ void elliptic_data_print_debug_counters(struct elliptic_data *elliptic_data)
 
 	if (elliptic_data->userspace_read_total !=
 		elliptic_data->isr_write_total) {
-		EL_PRINT_I("user space reads / isr writes : %u / %u",
+		EL_PRINT_D("user space reads / isr writes : %u / %u",
 			elliptic_data->userspace_read_total,
 			elliptic_data->isr_write_total);
 	}
 
-	EL_PRINT_I("total isr fifo discarded frame count : %u",
+	EL_PRINT_D("total isr fifo discarded frame count : %u",
 		elliptic_data->isr_fifo_discard_total);
 }
 
@@ -173,7 +172,7 @@ static int device_open(struct inode *inode, struct file *filp)
 	atomic_set(&elliptic_data->abort_io, 0);
 	elliptic_data_reset_debug_counters(elliptic_data);
 
-	EL_PRINT_I("Opened device elliptic%u", minor);
+	EL_PRINT_D("Opened device elliptic%u", minor);
 	dev->opened = 1;
 	return 0;
 }
@@ -270,7 +269,7 @@ size_t elliptic_data_pop(struct elliptic_data
 		++elliptic_data->userspace_read_total;
 	} else {
 		if (-ERESTARTSYS == result)
-			EL_PRINT_I("wait interrupted");
+			EL_PRINT_D("wait interrupted");
 		else
 			EL_PRINT_E("wait error = %d", result);
 
@@ -560,7 +559,7 @@ static int device_close(struct inode *inode, struct file *filp)
 	elliptic_data_cancel(elliptic_data);
 	up(&device->sem);
 
-	EL_PRINT_I("Closed device elliptic%u", minor);
+	EL_PRINT_D("Closed device elliptic%u", minor);
 	return 0;
 }
 

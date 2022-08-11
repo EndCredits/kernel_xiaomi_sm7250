@@ -68,7 +68,7 @@ UAPI_INC :=	-I$(AUDIO_ROOT)/include/$(UAPI_DIR)
 ############ COMMON ############
 COMMON_DIR :=	include
 COMMON_INC :=	-I$(AUDIO_ROOT)/$(COMMON_DIR)
-TFA_INC    :=   -I$(AUDIO_ROOT)/asoc/codecs/tfa98xx/inc
+TFA_INC    :=   -Itechpack/audio/asoc/codecs/tfa98xx/inc
 
 # for TFA9874 Amplifer
 ifdef CONFIG_SND_SOC_TFA9874
@@ -99,7 +99,7 @@ CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DDEBUG
 
 
-ifneq (,$(filter $(TARGET_PRODUCT), picasso picassoin))
+ifeq ($(CONFIG_ARCH_LITO), y)
 CDEFINES += -DTFA_NON_DSP_SOLUTION
 endif
 
@@ -130,5 +130,4 @@ endif
 obj-$(CONFIG_SND_SOC_TFA9874)    += tfa98xx_dlkm.o
 tfa98xx_dlkm-y := $(TFA98XX_OBJS)
 
-# inject some build related information
-DEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+

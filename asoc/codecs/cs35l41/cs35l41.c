@@ -12,7 +12,6 @@
  * published by the Free Software Foundation.
  *
  */
-#define DEBUG
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/version.h>
@@ -45,7 +44,6 @@
 #include "wm_adsp.h"
 #include "cs35l41.h"
 #include <sound/cs35l41.h>
-#include "send_data_to_xlog.h"
 static const char * const cs35l41_supplies[] = {
 	"VA",
 	"VP",
@@ -391,7 +389,7 @@ static int cs35l41_fast_switch_file_put(struct snd_kcontrol *kcontrol,
 		cs35l41->fast_switch_file_idx = i;
 		ret = cs35l41_do_fast_switch(cs35l41);
 	} else {
-		dev_info(cs35l41->dev, "do not need switch to delta (%u),origin delta %d, fast_switch_en %d\n",
+		dev_dbg(cs35l41->dev, "do not need switch to delta (%u),origin delta %d, fast_switch_en %d\n",
 			i, cs35l41->fast_switch_file_idx, cs35l41->fast_switch_en);
 	}
 
@@ -796,7 +794,6 @@ static irqreturn_t cs35l41_irq(int irq, void *data)
 	unsigned int status[4];
 	unsigned int masks[4];
 	unsigned int i;
-	char reason[] = "DSP";
 	dev_info(cs35l41->dev, "step into cs35l41 irq handler\n");
 
 	for (i = 0; i < ARRAY_SIZE(status); i++) {
@@ -922,7 +919,6 @@ static irqreturn_t cs35l41_irq(int irq, void *data)
 		//regmap_write(cs35l41->regmap, CS35L41_AMP_OUT_MUTE,
 		//	     1 << CS35L41_AMP_MUTE_SHIFT);
 		cs35l41->dc_current_cnt++;
-		send_DC_data_to_xlog((int)cs35l41->dc_current_cnt, reason);
 		dev_crit(cs35l41->dev, "DC current detected");
 	}
 
@@ -957,7 +953,7 @@ static int cs35l41_main_amp_event(struct snd_soc_dapm_widget *w,
 	int i;
 	bool pdn;
 	unsigned int val;
-	dev_info(cs35l41->dev, "%s: event = %d, DC counter = %d.\n",
+	dev_dbg(cs35l41->dev, "%s: event = %d, DC counter = %d.\n",
 		__func__, event, cs35l41->dc_current_cnt);
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
@@ -1328,7 +1324,7 @@ static int cs35l41_is_speaker_in_handset(struct snd_pcm_substream *substream,
 	fw_name = cs35l41->fast_switch_names[cs35l41->fast_switch_file_idx];
 
 	if (!strcmp(fw_name, HANDSET_TUNING)) {
-		dev_info(cs35l41->dev, "%s: '%s'[%d] = '%s'\n",
+		dev_dbg(cs35l41->dev, "%s: '%s'[%d] = '%s'\n",
 				__func__, rcv_dai->name,
 				cs35l41->fast_switch_file_idx, fw_name);
 		return 1;
@@ -1348,13 +1344,13 @@ static int cs35l41_pcm_hw_params(struct snd_pcm_substream *substream,
 	int val = 0;
 
 	if(cs35l41_is_speaker_in_handset(substream, dai)) {
-		dev_info(cs35l41->dev, "%s: speaker amp"
+		dev_dbg(cs35l41->dev, "%s: speaker amp"
 				" hw_parmas in handset mode\n", __func__);
 		return 0;
 	}
 
 	regmap_read(cs35l41->regmap, CS35L41_PLL_CLK_CTRL, &val);
-	dev_info(cs35l41->dev, "%s: Before 0x2c04 <= 0x%x\n",
+	dev_dbg(cs35l41->dev, "%s: Before 0x2c04 <= 0x%x\n",
 			__func__, val);
 	for (i = 0; i < ARRAY_SIZE(cs35l41_fs_rates); i++) {
 		if (rate == cs35l41_fs_rates[i].rate)
@@ -1369,7 +1365,7 @@ static int cs35l41_pcm_hw_params(struct snd_pcm_substream *substream,
 
 	cs35l41_component_set_sysclk(dai->component, 0, 0, 2 * rate * asp_width, 0);
 	regmap_read(cs35l41->regmap, CS35L41_PLL_CLK_CTRL, &val);
-	dev_info(cs35l41->dev, "%s: After 0x2c04 <= 0x%x\n",
+	dev_dbg(cs35l41->dev, "%s: After 0x2c04 <= 0x%x\n",
 			__func__, val);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -1456,12 +1452,12 @@ static int cs35l41_component_set_sysclk(struct snd_soc_component *component,
 
 
 	if (cs35l41->extclk_freq) {
-		dev_info(cs35l41->dev, "%s: clock has beed configured, clk_id=%d, src=%d, freq=%d\n",
+		dev_dbg(cs35l41->dev, "%s: clock has beed configured, clk_id=%d, src=%d, freq=%d\n",
 			__func__, clk_id, source, freq);
 		return 0;
 	}
 
-	dev_info(cs35l41->dev, "%s: clk_id=%d, src=%d, freq=%d, dir=%d\n",
+	dev_dbg(cs35l41->dev, "%s: clk_id=%d, src=%d, freq=%d, dir=%d\n",
 			__func__, clk_id, source, freq, dir);
 
 	switch (clk_id) {
@@ -2011,7 +2007,7 @@ static int cs35l41_handle_of_data(struct device *dev,
 	} else {
 		/* Device tree provides file name */
 		num_fast_switch			= (size_t)ret;
-		dev_info(dev, "num_fast_switch:%zu\n", num_fast_switch);
+		dev_dbg(dev, "num_fast_switch:%zu\n", num_fast_switch);
 		cs35l41->fast_switch_names =
 			devm_kmalloc(dev, num_fast_switch * sizeof(char *),
 				     GFP_KERNEL);
@@ -2021,7 +2017,7 @@ static int cs35l41_handle_of_data(struct device *dev,
 					      cs35l41->fast_switch_names,
 					      num_fast_switch);
 		for (i = 0; i < num_fast_switch; i++) {
-			dev_info(dev, "%d:%s\n", i,
+			dev_dbg(dev, "%d:%s\n", i,
 				 cs35l41->fast_switch_names[i]);
 		}
 		cs35l41->fast_switch_enum.items	= num_fast_switch;
@@ -2317,7 +2313,7 @@ int cs35l41_probe(struct cs35l41_private *cs35l41,
 		ret = PTR_ERR(cs35l41->reset_gpio);
 		cs35l41->reset_gpio = NULL;
 		if (ret == -EBUSY) {
-			dev_info(cs35l41->dev,
+			dev_dbg(cs35l41->dev,
 				 "Reset line busy, assuming shared reset\n");
 		} else {
 			dev_err(cs35l41->dev,
@@ -2452,7 +2448,7 @@ int cs35l41_probe(struct cs35l41_private *cs35l41,
 	cs35l41->extclk_freq = 0;
 
 
-	dev_info(cs35l41->dev, "Cirrus Logic CS35L41 (%x), Revision: %02X\n",
+	dev_dbg(cs35l41->dev, "Cirrus Logic CS35L41 (%x), Revision: %02X\n",
 			regid, reg_revid);
 
 	return 0;
