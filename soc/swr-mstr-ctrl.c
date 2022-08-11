@@ -3032,6 +3032,7 @@ static int swrm_runtime_resume(struct device *dev)
 	int ret = 0;
 	bool swrm_clk_req_err = false;
 	bool hw_core_err = false;
+	bool aud_core_err = false;
 
 	struct swr_master *mstr = &swrm->master;
 	struct swr_device *swr_dev;
