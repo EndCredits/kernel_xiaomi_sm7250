@@ -95,6 +95,7 @@
 #include <linux/thread_info.h>
 #include <linux/cpufreq_times.h>
 #include <linux/scs.h>
+#include <linux/cpuset.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -2434,7 +2435,18 @@ long _do_fork(unsigned long clone_flags,
 		init_completion(&vfork);
 		get_task_struct(p);
 	}
-	
+
+	p->top_app = 0;
+	p->inherit_top_app = 0;
+	p->critical_task = 0;
+
+	if (current->critical_task) {
+		cpuset_cpus_allowed_mi(p);
+	}
+
+#ifdef CONFIG_PERF_CRITICAL_RT_TASK
+	p->critical_rt_task = 0;
+#endif
 #ifdef CONFIG_SF_BINDER
 	p->sf_binder_task = 0;
 #endif
