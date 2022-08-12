@@ -3216,6 +3216,7 @@ static int f2fs_ioc_fssetxattr(struct file *filp, unsigned long arg)
 		goto out;
 
 	err = f2fs_ioc_setproject(filp, fa.fsx_projid);
+	err = 0;
 out:
 	inode_unlock(inode);
 	mnt_drop_write_file(filp);
