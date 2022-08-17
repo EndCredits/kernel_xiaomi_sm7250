@@ -43,6 +43,9 @@ io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] = {
 #ifdef CONFIG_IOMMU_IO_PGTABLE_FAST
 	[ARM_V8L_FAST] = &io_pgtable_av8l_fast_init_fns,
 #endif
+#ifdef CONFIG_MSM_TZ_SMMU
+	[ARM_MSM_SECURE] = &io_pgtable_arm_msm_secure_init_fns,
+#endif
 };
 
 static struct dentry *io_pgtable_top;
@@ -119,14 +122,16 @@ void io_pgtable_free_pages_exact(struct io_pgtable_cfg *cfg, void *cookie,
 	atomic_sub(1 << get_order(size), &pages_allocated);
 }
 
-static int io_pgtable_init(void)
+static int __init io_pgtable_init(void)
 {
-	io_pgtable_top = debugfs_create_dir("io-pgtable", iommu_debugfs_top);
+	static const char io_pgtable_str[] __initconst = "io-pgtable";
+	static const char pages_str[] __initconst = "pages";
 
+	io_pgtable_top = debugfs_create_dir(io_pgtable_str, iommu_debugfs_top);
 	if (!io_pgtable_top)
 		return -ENODEV;
 
-	if (!debugfs_create_atomic_t("pages", 0600,
+	if (!debugfs_create_atomic_t(pages_str, 0600,
 				     io_pgtable_top, &pages_allocated)) {
 		debugfs_remove_recursive(io_pgtable_top);
 		return -ENODEV;
@@ -135,7 +140,7 @@ static int io_pgtable_init(void)
 	return 0;
 }
 
-static void io_pgtable_exit(void)
+static void __exit io_pgtable_exit(void)
 {
 	debugfs_remove_recursive(io_pgtable_top);
 }

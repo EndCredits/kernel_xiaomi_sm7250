@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <asm/barrier.h>
@@ -73,6 +73,11 @@ int ipa3_enable_data_path(u32 clnt_hdl)
 				holb_cfg.tmr_val = IPA_HOLB_TMR_VAL;
 			else
 				holb_cfg.tmr_val = IPA_HOLB_TMR_VAL_4_5;
+		} else if (ipa3_ctx->ipa_hw_type == IPA_HW_v4_5 &&
+				ipa3_ctx->platform_type == IPA_PLAT_TYPE_APQ &&
+				ep->client == IPA_CLIENT_USB_CONS) {
+			holb_cfg.en = IPA_HOLB_TMR_EN;
+			holb_cfg.tmr_val = IPA_HOLB_TMR_VAL_4_5;
 		} else {
 			holb_cfg.en = IPA_HOLB_TMR_DIS;
 			holb_cfg.tmr_val = 0;
@@ -1341,8 +1346,10 @@ int ipa3_set_reset_client_cons_pipe_sus_holb(bool set_reset,
 			IPA_ENDP_INIT_HOL_BLOCK_EN_n,
 			pipe_idx, &ep_holb);
 
-		/* IPA4.5 issue requires HOLB_EN to be written twice */
-		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5)
+		/* For targets > IPA_4.0 issue requires HOLB_EN to be
+		 * written twice.
+		 */
+		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_0)
 			ipahal_write_reg_n_fields(
 				IPA_ENDP_INIT_HOL_BLOCK_EN_n,
 				pipe_idx, &ep_holb);
@@ -1411,6 +1418,8 @@ int ipa3_xdci_disconnect(u32 clnt_hdl, bool should_force_clear, u32 qmi_req_id)
 	if (!ep->keep_ipa_awake)
 		IPA_ACTIVE_CLIENTS_INC_EP(ipa3_get_client_mapping(clnt_hdl));
 
+	ipa3_disable_data_path(clnt_hdl);
+
 	if (!IPA_CLIENT_IS_CONS(ep->client)) {
 		IPADBG("Stopping PROD channel - hdl=%d clnt=%d\n",
 			clnt_hdl, ep->client);
@@ -1434,8 +1443,6 @@ int ipa3_xdci_disconnect(u32 clnt_hdl, bool should_force_clear, u32 qmi_req_id)
 			goto stop_chan_fail;
 		}
 	}
-
-	ipa3_disable_data_path(clnt_hdl);
 
 	IPA_ACTIVE_CLIENTS_DEC_EP(ipa3_get_client_mapping(clnt_hdl));
 
@@ -1467,7 +1474,10 @@ int ipa3_release_gsi_channel(u32 clnt_hdl)
 		IPA_ACTIVE_CLIENTS_INC_EP(ipa3_get_client_mapping(clnt_hdl));
 
 	/* Set the disconnect in progress flag to avoid calling cb.*/
+	spin_lock(&ipa3_ctx->disconnect_lock);
 	atomic_set(&ep->disconnect_in_progress, 1);
+	spin_unlock(&ipa3_ctx->disconnect_lock);
+
 
 	gsi_res = gsi_dealloc_channel(ep->gsi_chan_hdl);
 	if (gsi_res != GSI_STATUS_SUCCESS) {
@@ -1487,7 +1497,9 @@ int ipa3_release_gsi_channel(u32 clnt_hdl)
 	if (!ep->keep_ipa_awake)
 		IPA_ACTIVE_CLIENTS_DEC_EP(ipa3_get_client_mapping(clnt_hdl));
 
+	spin_lock(&ipa3_ctx->disconnect_lock);
 	memset(&ipa3_ctx->ep[clnt_hdl], 0, sizeof(struct ipa3_ep_context));
+	spin_unlock(&ipa3_ctx->disconnect_lock);
 
 	IPADBG("exit\n");
 	return 0;

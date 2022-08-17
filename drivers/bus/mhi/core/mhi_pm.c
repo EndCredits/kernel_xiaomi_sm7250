@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved. */
+/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved. */
 
 #include <linux/debugfs.h>
 #include <linux/delay.h>
@@ -395,7 +395,8 @@ int mhi_pm_m0_transition(struct mhi_controller *mhi_cntrl)
 
 		read_lock_irq(&mhi_chan->lock);
 		/* only ring DB if ring is not empty */
-		if (tre_ring->base && tre_ring->wp  != tre_ring->rp)
+		if (tre_ring->base && tre_ring->wp  != tre_ring->rp &&
+		    mhi_chan->ch_state == MHI_CH_STATE_ENABLED)
 			mhi_ring_chan_db(mhi_cntrl, mhi_chan);
 		read_unlock_irq(&mhi_chan->lock);
 	}
@@ -1061,8 +1062,8 @@ void mhi_control_error(struct mhi_controller *mhi_cntrl)
 				sfr_info->buf_addr);
 	}
 
-	/* link is not down if device is in RDDM */
-	transition_state = (mhi_cntrl->ee == MHI_EE_RDDM) ?
+	/* link is not down if device supports RDDM */
+	transition_state = (mhi_cntrl->rddm_supported) ?
 		MHI_PM_DEVICE_ERR_DETECT : MHI_PM_LD_ERR_FATAL_DETECT;
 
 	write_lock_irq(&mhi_cntrl->pm_lock);
@@ -1511,6 +1512,15 @@ int mhi_pm_fast_resume(struct mhi_controller *mhi_cntrl, bool notify_client)
 	}
 
 	if (mhi_cntrl->rddm_supported) {
+
+		/* check EP is in proper state */
+		if (mhi_cntrl->link_status(mhi_cntrl, mhi_cntrl->priv_data)) {
+			MHI_ERR("Unable to access EP Config space\n");
+			write_unlock_irq(&mhi_cntrl->pm_lock);
+			tasklet_enable(&mhi_cntrl->mhi_event->task);
+			return -ETIMEDOUT;
+		}
+
 		if (mhi_get_exec_env(mhi_cntrl) == MHI_EE_RDDM &&
 		    !mhi_cntrl->power_down) {
 			mhi_cntrl->ee = MHI_EE_RDDM;
@@ -1670,7 +1680,8 @@ int mhi_device_get_sync(struct mhi_device *mhi_dev, int vote)
 }
 EXPORT_SYMBOL(mhi_device_get_sync);
 
-int mhi_device_get_sync_atomic(struct mhi_device *mhi_dev, int timeout_us)
+int mhi_device_get_sync_atomic(struct mhi_device *mhi_dev, int timeout_us,
+			       bool in_panic)
 {
 	struct mhi_controller *mhi_cntrl = mhi_dev->mhi_cntrl;
 
@@ -1696,11 +1707,20 @@ int mhi_device_get_sync_atomic(struct mhi_device *mhi_dev, int timeout_us)
 		return 0;
 	}
 
-	while (mhi_cntrl->pm_state != MHI_PM_M0 &&
-			!MHI_PM_IN_ERROR_STATE(mhi_cntrl->pm_state) &&
-			timeout_us > 0) {
-		udelay(MHI_FORCE_WAKE_DELAY_US);
-		timeout_us -= MHI_FORCE_WAKE_DELAY_US;
+	if (in_panic) {
+		while (mhi_get_mhi_state(mhi_cntrl) != MHI_STATE_M0 &&
+		       !MHI_PM_IN_ERROR_STATE(mhi_cntrl->pm_state) &&
+		       timeout_us > 0) {
+			udelay(MHI_FORCE_WAKE_DELAY_US);
+			timeout_us -= MHI_FORCE_WAKE_DELAY_US;
+		}
+	} else {
+		while (mhi_cntrl->pm_state != MHI_PM_M0 &&
+		       !MHI_PM_IN_ERROR_STATE(mhi_cntrl->pm_state) &&
+		       timeout_us > 0) {
+			udelay(MHI_FORCE_WAKE_DELAY_US);
+			timeout_us -= MHI_FORCE_WAKE_DELAY_US;
+		}
 	}
 
 	if (MHI_PM_IN_ERROR_STATE(mhi_cntrl->pm_state) || timeout_us <= 0) {

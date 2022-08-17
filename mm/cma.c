@@ -45,11 +45,13 @@ phys_addr_t cma_get_base(const struct cma *cma)
 {
 	return PFN_PHYS(cma->base_pfn);
 }
+EXPORT_SYMBOL(cma_get_base);
 
 unsigned long cma_get_size(const struct cma *cma)
 {
 	return cma->count << PAGE_SHIFT;
 }
+EXPORT_SYMBOL(cma_get_size);
 
 const char *cma_get_name(const struct cma *cma)
 {
@@ -559,7 +561,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 
 	if (ret && !no_warn) {
 		pr_err("%s: %s: alloc failed, req-size: %zu pages, ret: %d\n",
-			__func__, cma->name, cma->count, ret);
+			__func__, cma->name, count, ret);
 		cma_debug_show_areas(cma);
 	}
 

@@ -24,7 +24,7 @@ obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
 obj-$(CONFIG_QCOM_IPCC) += qcom_ipcc.o
 obj-$(CONFIG_QCOM_LLCC) += llcc-slice.o
 obj-$(CONFIG_QCOM_KONA_LLCC) += llcc-kona.o
-obj-$(CONFIG_QCOM_LITO_LLCC) += llcc-lito.o
+obj-$(CONFIG_QCOM_LITO_LLCC) += llcc-lito.o llcc-orchid.o
 obj-$(CONFIG_QCOM_LAGOON_LLCC) += llcc-lagoon.o
 obj-$(CONFIG_QCOM_LLCC_PERFMON) += llcc_perfmon.o
 obj-$(CONFIG_QCOM_APR) += apr.o
@@ -86,6 +86,7 @@ ifdef CONFIG_QCOM_RPMH
 else
        obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpm_master_stat.o
 endif
+obj-$(CONFIG_QCOM_DCC) += dcc.o
 obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpm_stats.o
 obj-$(CONFIG_QCOM_MEM_OFFLINE) += mem-offline.o
 obj-$(CONFIG_QTI_DDR_STATS_LOG) += ddr_stats.o
@@ -104,7 +105,9 @@ obj-$(CONFIG_DEBUG_POLICY_STATUS) += dp_status.o
 obj-$(CONFIG_QCOM_CX_IPEAK) += cx_ipeak.o
 obj-$(CONFIG_QTI_L2_REUSE) += l2_reuse.o
 obj-$(CONFIG_ICNSS2) += icnss2/
+obj-$(CONFIG_WCNSS_CORE) += wcnss/
 obj-$(CONFIG_QTI_CRYPTO_COMMON) += crypto-qti-common.o
 obj-$(CONFIG_QTI_CRYPTO_TZ) += crypto-qti-tz.o
 obj-$(CONFIG_QTI_HW_KEY_MANAGER) += hwkm_qti.o
 hwkm_qti-y += hwkm.o
+obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o

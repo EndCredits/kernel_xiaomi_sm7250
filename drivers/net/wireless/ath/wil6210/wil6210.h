@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: ISC */
 /*
  * Copyright (c) 2012-2017 Qualcomm Atheros, Inc.
- * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  */
 
 #ifndef __WIL6210_H__
@@ -330,8 +330,14 @@ struct RGF_ICR {
 #define RGF_PAL_UNIT_ICR		(0x88266c) /* struct RGF_ICR */
 #define RGF_PCIE_LOS_COUNTER_CTL	(0x882dc4)
 
+#define	RGF_MAC_PMC_GENERAL_0		(0x88607c)
+	#define	BIT_STOP_PMC_RECORDING		BIT(17)
+
 /* MAC timer, usec, for packet lifetime */
 #define RGF_MAC_MTRL_COUNTER_0		(0x886aa8)
+
+#define	RGF_MSRB_CAPTURE_TS_LOW		(0x886eb8)
+#define	RGF_MSRB_CAPTURE_TS_HIGH	(0x886ebc)
 
 #define RGF_CAF_ICR_TALYN_MB		(0x8893d4) /* struct RGF_ICR */
 #define RGF_CAF_ICR			(0x88946c) /* struct RGF_ICR */
@@ -791,6 +797,11 @@ struct wil_sta_info {
 	struct wil_tid_crypto_rx group_crypto_rx;
 	u8 aid; /* 1-254; 0 if unknown/not reported */
 	u8 fst_link_loss;
+
+	/* amsdu frame related info to check if the frame is valid */
+	int amsdu_drop_sn;
+	int amsdu_drop_tid;
+	u8 amsdu_drop;
 };
 
 enum {
@@ -971,6 +982,14 @@ enum wil_fw_state {
 	WIL_FW_STATE_ERROR,
 };
 
+/* Used for tx latency debugging */
+struct wil_tx_latency_threshold_info {
+	u32 threshold_detected;
+	u32 rx_intr_cnt;
+	u32 tx_intr_cnt;
+	u32 hard_irq_cnt;
+} __packed;
+
 struct wil6210_priv {
 	struct pci_dev *pdev;
 	u32 bar_size;
@@ -1142,6 +1161,17 @@ struct wil6210_priv {
 
 	u32 tx_reserved_entries; /* Used only in Talyn code-path */
 	s32 cqm_rssi_thold;
+
+	/* For now, this applies to VR mode only. Can be extended
+	 * in the future to apply also to other modes.
+	 */
+	u8 max_mcs;
+
+	/* Tx latency debugging */
+	u32 tx_latency_threshold_low;
+	u32 tx_latency_threshold_high;
+	struct wil_tx_latency_threshold_info tx_latency_threshold_info;
+	u32 tx_latency_threshold_base;
 };
 
 #define wil_to_wiphy(i) (i->wiphy)
@@ -1265,6 +1295,12 @@ void wil_hex_dump_misc(const char *prefix_str, int prefix_type, int rowsize,
 {
 }
 #endif /* defined(CONFIG_DYNAMIC_DEBUG) */
+
+static inline bool wil_tx_latency_threshold_enabled(struct wil6210_priv *wil)
+{
+	return (wil->tx_latency_threshold_base &&
+		wil->tx_latency_threshold_low);
+}
 
 void wil_memcpy_fromio_32(void *dst, const volatile void __iomem *src,
 			  size_t count);
@@ -1583,4 +1619,6 @@ int wmi_set_cqm_rssi_config(struct wil6210_priv *wil,
 			    s32 rssi_thold, u32 rssi_hyst);
 int wmi_set_fst_config(struct wil6210_priv *wil, const u8 *bssid, u8 enabled,
 		       u8 entry_mcs, u8 exit_mcs, u8 slevel);
+int wmi_ut_update_txlatency_base(struct wil6210_priv *wil);
+void wil_sta_info_amsdu_init(struct wil_sta_info *sta);
 #endif /* __WIL6210_H__ */

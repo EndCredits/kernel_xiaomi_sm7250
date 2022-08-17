@@ -1,11 +1,10 @@
-BRANCH=android-4.19
-KERNEL_DIR=common
+BRANCH=android-4.19-stable
+KMI_GENERATION=0
 
-CC=clang
-LD=ld.lld
-NM=llvm-nm
-OBJCOPY=llvm-objcopy
-CLANG_PREBUILT_BIN=prebuilts-master/clang/host/linux-x86/clang-r377782c/bin
+LLVM=1
+DEPMOD=depmod
+CLANG_PREBUILT_BIN=prebuilts-master/clang/host/linux-x86/clang-r399163b/bin
+BUILDTOOLS_PREBUILT_BIN=build/build-tools/path/linux-x86
 
 EXTRA_CMDS=''
 STOP_SHIP_TRACEPRINTK=1

@@ -5295,8 +5295,8 @@ int ipa3_cfg_ep_holb(u32 clnt_hdl, const struct ipa_ep_cfg_holb *ep_holb)
 	ipa3_ctx->ep[clnt_hdl].holb.en = IPA_HOLB_TMR_EN;
 	ipahal_write_reg_n_fields(IPA_ENDP_INIT_HOL_BLOCK_EN_n,
 		clnt_hdl, ep_holb);
-	/* IPA4.5 issue requires HOLB_EN to be written twice */
-	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5)
+	/* For targets > IPA_4.0 issue requires HOLB_EN to be written twice */
+	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_0)
 		ipahal_write_reg_n_fields(IPA_ENDP_INIT_HOL_BLOCK_EN_n,
 			clnt_hdl, ep_holb);
 
@@ -6071,12 +6071,21 @@ static int __ipa3_alloc_counter_hdl
 	return id;
 }
 
-int ipa3_alloc_counter_id(struct ipa_ioc_flt_rt_counter_alloc *counter)
+int ipa3_alloc_counter_id(struct ipa_ioc_flt_rt_counter_alloc *header)
 {
 	int i, unused_cnt, unused_max, unused_start_id;
+	struct ipa_ioc_flt_rt_counter_alloc *counter;
+
+	counter = kmem_cache_zalloc(ipa3_ctx->fnr_stats_cache, GFP_KERNEL);
+	if (!counter) {
+		IPAERR_RL("failed to alloc fnr stats counter object\n");
+		spin_unlock(&ipa3_ctx->flt_rt_counters.hdl_lock);
+		return -ENOMEM;
+	}
 
 	idr_preload(GFP_KERNEL);
 	spin_lock(&ipa3_ctx->flt_rt_counters.hdl_lock);
+	memcpy(counter, header, sizeof(struct ipa_ioc_flt_rt_counter_alloc));
 
 	/* allocate hw counters */
 	counter->hw_counter.start_id = 0;
@@ -6177,7 +6186,7 @@ mark_hw_cnt:
 	unused_start_id = counter->hw_counter.start_id;
 	if (unused_start_id < 1 ||
 		unused_start_id > IPA_FLT_RT_HW_COUNTER) {
-		IPAERR("unexpected hw_counter start id %d\n",
+		IPAERR_RL("unexpected hw_counter start id %d\n",
 			   unused_start_id);
 		goto err;
 	}
@@ -6192,7 +6201,7 @@ mark_sw_cnt:
 		- IPA_FLT_RT_HW_COUNTER;
 	if (unused_start_id < 1 ||
 		unused_start_id > IPA_FLT_RT_SW_COUNTER) {
-		IPAERR("unexpected sw_counter start id %d\n",
+		IPAERR_RL("unexpected sw_counter start id %d\n",
 			   unused_start_id);
 		goto err;
 	}
@@ -6202,12 +6211,14 @@ mark_sw_cnt:
 done:
 	/* get a handle from idr for dealloc */
 	counter->hdl = __ipa3_alloc_counter_hdl(counter);
+	memcpy(header, counter, sizeof(struct ipa_ioc_flt_rt_counter_alloc));
 	spin_unlock(&ipa3_ctx->flt_rt_counters.hdl_lock);
 	idr_preload_end();
 	return 0;
 
 err:
 	counter->hdl = -1;
+	kmem_cache_free(ipa3_ctx->fnr_stats_cache, counter);
 	spin_unlock(&ipa3_ctx->flt_rt_counters.hdl_lock);
 	idr_preload_end();
 	return -ENOMEM;
@@ -6221,7 +6232,7 @@ void ipa3_counter_remove_hdl(int hdl)
 	spin_lock(&ipa3_ctx->flt_rt_counters.hdl_lock);
 	counter = idr_find(&ipa3_ctx->flt_rt_counters.hdl, hdl);
 	if (counter == NULL) {
-		IPAERR("unexpected hdl %d\n", hdl);
+		IPAERR_RL("unexpected hdl %d\n", hdl);
 		goto err;
 	}
 	/* remove counters belong to this hdl, set used back to 0 */
@@ -6231,7 +6242,7 @@ void ipa3_counter_remove_hdl(int hdl)
 		memset(&ipa3_ctx->flt_rt_counters.used_hw + offset,
 			   0, counter->hw_counter.num_counters * sizeof(bool));
 	} else {
-		IPAERR("unexpected hdl %d\n", hdl);
+		IPAERR_RL("unexpected hdl %d\n", hdl);
 		goto err;
 	}
 	offset = counter->sw_counter.start_id - 1 - IPA_FLT_RT_HW_COUNTER;
@@ -6240,11 +6251,12 @@ void ipa3_counter_remove_hdl(int hdl)
 		memset(&ipa3_ctx->flt_rt_counters.used_sw + offset,
 		   0, counter->sw_counter.num_counters * sizeof(bool));
 	} else {
-		IPAERR("unexpected hdl %d\n", hdl);
+		IPAERR_RL("unexpected hdl %d\n", hdl);
 		goto err;
 	}
 	/* remove the handle */
 	idr_remove(&ipa3_ctx->flt_rt_counters.hdl, hdl);
+	kmem_cache_free(ipa3_ctx->fnr_stats_cache, counter);
 err:
 	spin_unlock(&ipa3_ctx->flt_rt_counters.hdl_lock);
 }
@@ -6261,8 +6273,10 @@ void ipa3_counter_id_remove_all(void)
 	memset(&ipa3_ctx->flt_rt_counters.used_sw, 0,
 		   sizeof(ipa3_ctx->flt_rt_counters.used_sw));
 	/* remove all handles */
-	idr_for_each_entry(&ipa3_ctx->flt_rt_counters.hdl, counter, hdl)
+	idr_for_each_entry(&ipa3_ctx->flt_rt_counters.hdl, counter, hdl) {
 		idr_remove(&ipa3_ctx->flt_rt_counters.hdl, hdl);
+		kmem_cache_free(ipa3_ctx->fnr_stats_cache, counter);
+	}
 	spin_unlock(&ipa3_ctx->flt_rt_counters.hdl_lock);
 }
 
@@ -6803,7 +6817,7 @@ u32 ipa3_get_num_pipes(void)
 
 /**
  * ipa3_disable_apps_wan_cons_deaggr()-
- * set ipa_ctx->ipa_client_apps_wan_cons_agg_gro
+ * set ipa3_ctx->ipa_client_apps_wan_cons_agg_gro
  *
  * Return value: 0 or negative in case of failure
  */
@@ -6876,6 +6890,15 @@ int ipa3_is_vlan_mode(enum ipa_vlan_ifaces iface, bool *res)
 
 	IPADBG("Driver %d vlan mode is %d\n", iface, *res);
 	return 0;
+}
+
+/*
+ * ipa3_pm_is_used - check if PM support is present or not
+ * For IPAv3, PM is supported always
+ */
+static bool ipa3_pm_is_used(void)
+{
+	return true;
 }
 
 int ipa3_bind_api_controller(enum ipa_hw_type ipa_hw_type,
@@ -7092,6 +7115,7 @@ int ipa3_bind_api_controller(enum ipa_hw_type ipa_hw_type,
 	api_ctrl->ipa_get_prot_id =
 		ipa3_get_prot_id;
 	api_ctrl->ipa_get_lan_rx_napi = ipa3_get_lan_rx_napi;
+	api_ctrl->ipa_pm_is_used = ipa3_pm_is_used;
 	return 0;
 }
 
@@ -7597,13 +7621,9 @@ static bool ipa3_gsi_channel_is_quite(struct ipa3_ep_context *ep)
 	bool empty;
 
 	gsi_is_channel_empty(ep->gsi_chan_hdl, &empty);
-	if (!empty) {
+	if (!empty)
 		IPADBG("ch %ld not empty\n", ep->gsi_chan_hdl);
-		/* queue a work to start polling if don't have one */
-		atomic_set(&ipa3_ctx->transport_pm.eot_activity, 1);
-		if (!atomic_read(&ep->sys->curr_polling_state))
-			__ipa_gsi_irq_rx_scedule_poll(ep->sys);
-	}
+	/*Schedule NAPI only from interrupt context to avoid race conditions*/
 	return empty;
 }
 

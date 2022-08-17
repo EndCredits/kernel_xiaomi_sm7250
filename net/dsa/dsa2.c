@@ -261,6 +261,7 @@ static int dsa_port_setup(struct dsa_port *dp)
 	int err = 0;
 
 	memset(&dp->devlink_port, 0, sizeof(dp->devlink_port));
+	dp->mac = of_get_mac_address(dp->dn);
 
 	if (dp->type != DSA_PORT_TYPE_UNUSED)
 		err = devlink_port_register(ds->devlink, &dp->devlink_port,
@@ -412,7 +413,7 @@ static int dsa_tree_setup_switches(struct dsa_switch_tree *dst)
 
 		err = dsa_switch_setup(ds);
 		if (err)
-			return err;
+			continue;
 
 		for (port = 0; port < ds->num_ports; port++) {
 			dp = &ds->ports[port];

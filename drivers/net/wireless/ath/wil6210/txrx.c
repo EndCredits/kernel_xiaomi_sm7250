@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: ISC
 /*
  * Copyright (c) 2012-2017 Qualcomm Atheros, Inc.
- * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/etherdevice.h>
@@ -935,7 +935,9 @@ void wil_netif_rx(struct sk_buff *skb, struct net_device *ndev, int cid,
 			dev_kfree_skb(skb);
 			goto stats;
 		}
-	} else if (wdev->iftype == NL80211_IFTYPE_AP && !vif->ap_isolate) {
+	} else if (wdev->iftype == NL80211_IFTYPE_AP && !vif->ap_isolate &&
+		   /* pass EAPOL packets to local net stack only */
+		   (wil_skb_get_protocol(skb) != htons(ETH_P_PAE))) {
 		if (mcast) {
 			/* send multicast frames both to higher layers in
 			 * local net stack and back to the wireless medium
@@ -1003,6 +1005,7 @@ void wil_netif_rx_any(struct sk_buff *skb, struct net_device *ndev)
 {
 	int cid, security;
 	struct wil6210_priv *wil = ndev_to_wil(ndev);
+	struct wil6210_vif *vif = ndev_to_vif(ndev);
 	struct wil_net_stats *stats;
 
 	wil->txrx_ops.get_netif_rx_params(skb, &cid, &security);
@@ -1010,6 +1013,18 @@ void wil_netif_rx_any(struct sk_buff *skb, struct net_device *ndev)
 	stats = &wil->sta[cid].stats;
 
 	skb_orphan(skb);
+
+	/* pass only EAPOL packets as plaintext */
+	if (vif->privacy && !security &&
+	    wil_skb_get_protocol(skb) != htons(ETH_P_PAE)) {
+		wil_dbg_txrx(wil,
+			     "Rx drop plaintext frame with %d bytes in secure network\n",
+			     skb->len);
+		dev_kfree_skb(skb);
+		ndev->stats.rx_dropped++;
+		stats->rx_dropped++;
+		return;
+	}
 
 	if (security && (wil->txrx_ops.rx_crypto_check(wil, skb) != 0)) {
 		dev_kfree_skb(skb);
@@ -2454,19 +2469,51 @@ netdev_tx_t wil_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	return NET_XMIT_DROP;
 }
 
-void wil_tx_latency_calc(struct wil6210_priv *wil, struct sk_buff *skb,
-			 struct wil_sta_info *sta)
+static void wil_process_tx_latency(struct wil6210_priv *wil, u32 *tsf_low,
+				   u32 *tsf_high, ktime_t *before_tsf_read)
+{
+	/* Stop PMC recording */
+	wil_s(wil, RGF_MAC_PMC_GENERAL_0, BIT_STOP_PMC_RECORDING);
+
+	*before_tsf_read = ktime_get();
+	*tsf_low = wil_r(wil, RGF_MSRB_CAPTURE_TS_LOW);
+	*tsf_high = wil_r(wil, RGF_MSRB_CAPTURE_TS_HIGH);
+
+	wil_w(wil,
+	      wil->tx_latency_threshold_base +
+		      offsetof(struct wil_tx_latency_threshold_info,
+			       threshold_detected),
+	      0xffffffff);
+}
+
+static inline void
+wil_dump_vring_tx_desc(struct wil6210_priv *wil, struct vring_tx_desc *dd)
+{
+	wil_err(wil,
+		"Desc.MAC: d[0]: 0x%x, d[1]: 0x%x, d[2]: 0x%x, ucode_cmd: 0x%x\n",
+		dd->mac.d[0], dd->mac.d[1], dd->mac.d[2], dd->mac.ucode_cmd);
+	wil_err(wil,
+		"Desc.DMA: d0: 0x%x, addr.high: 0x%x, addr.low: 0x%x, ip_length: 0x%x, b11: 0x%x, error: 0x%x, status: 0x%x, length: 0x%x\n",
+		dd->dma.d0, dd->dma.addr.addr_high, dd->dma.addr.addr_low,
+		dd->dma.ip_length, dd->dma.b11, dd->dma.error,
+		dd->dma.status, dd->dma.length);
+}
+
+int wil_tx_latency_calc_common(struct wil6210_priv *wil, struct sk_buff *skb,
+			       struct wil_sta_info *sta)
 {
 	int skb_time_us;
 	int bin;
+	ktime_t end;
 
 	if (!wil->tx_latency)
-		return;
+		return 0;
 
 	if (ktime_to_ms(*(ktime_t *)&skb->cb) == 0)
-		return;
+		return 0;
 
-	skb_time_us = ktime_us_delta(ktime_get(), *(ktime_t *)&skb->cb);
+	end = ktime_get();
+	skb_time_us = ktime_us_delta(end, *(ktime_t *)&skb->cb);
 	bin = skb_time_us / wil->tx_latency_res;
 	bin = min_t(int, bin, WIL_NUM_LATENCY_BINS - 1);
 
@@ -2477,6 +2524,37 @@ void wil_tx_latency_calc(struct wil6210_priv *wil, struct sk_buff *skb,
 		sta->stats.tx_latency_min_us = skb_time_us;
 	if (skb_time_us > sta->stats.tx_latency_max_us)
 		sta->stats.tx_latency_max_us = skb_time_us;
+	if (!wil_tx_latency_threshold_enabled(wil))
+		return 0;
+	if (wil->tx_latency_threshold_info.threshold_detected == 0 &&
+	    skb_time_us >= wil->tx_latency_threshold_low &&
+	    skb_time_us <= wil->tx_latency_threshold_high) {
+		ktime_t start, before_tsf_read;
+		u32 tsf_low, tsf_high;
+
+		start = *(ktime_t *)&skb->cb;
+		wil->tx_latency_threshold_info.threshold_detected = 1;
+		wil_process_tx_latency(wil, &tsf_low, &tsf_high,
+				       &before_tsf_read);
+		wil_err(wil,
+			"Latency Start: %lld, end: %lld, diff: %lld (us)\n",
+			ktime_to_us(start), ktime_to_us(end),
+			ktime_to_us(end) - ktime_to_us(start));
+		wil_err(wil,
+			"TSF Low: 0x%x, high: 0x%x, before: %lld\n",
+			tsf_low, tsf_high, ktime_to_us(before_tsf_read));
+		return 1;
+	}
+	return 0;
+}
+
+static inline void
+wil_tx_latency_calc(struct wil6210_priv *wil, struct sk_buff *skb,
+		    struct wil_sta_info *sta,
+		    struct vring_tx_desc *dd)
+{
+	if (wil_tx_latency_calc_common(wil, skb, sta))
+		wil_dump_vring_tx_desc(wil, dd);
 }
 
 /**
@@ -2567,7 +2645,7 @@ int wil_tx_complete(struct wil6210_vif *vif, int ringid)
 						stats->tx_bytes += skb->len;
 
 						wil_tx_latency_calc(wil, skb,
-							&wil->sta[cid]);
+							&wil->sta[cid], &dd);
 					}
 				} else {
 					ndev->stats.tx_errors++;

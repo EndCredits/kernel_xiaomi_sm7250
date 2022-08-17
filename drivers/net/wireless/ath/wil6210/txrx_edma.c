@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: ISC
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  */
 
 #include <linux/etherdevice.h>
@@ -811,6 +811,104 @@ static int wil_tx_ring_modify_edma(struct wil6210_vif *vif, int ring_id,
 	return -EOPNOTSUPP;
 }
 
+static int wil_check_amsdu(struct wil6210_priv *wil, void *msg, int cid,
+			   struct wil_ring_rx_data *rxdata,
+			   struct sk_buff *skb)
+{
+	u8 *sa, *da;
+	int mid, tid;
+	u16 seq;
+	struct wil6210_vif *vif;
+	struct net_device *ndev;
+	struct wil_sta_info *sta;
+
+	/* drop all WDS packets - not supported */
+	if (wil_rx_status_get_ds_type(wil, msg) == WIL_RX_EDMA_DS_TYPE_WDS) {
+		wil_dbg_txrx(wil, "WDS is not supported");
+		return -EAGAIN;
+	}
+
+	/* check amsdu packets */
+	sta = &wil->sta[cid];
+	if (!wil_rx_status_is_basic_amsdu(msg)) {
+		if (sta->amsdu_drop_sn != -1)
+			wil_sta_info_amsdu_init(sta);
+		return 0;
+	}
+
+	mid = wil_rx_status_get_mid(msg);
+	tid = wil_rx_status_get_tid(msg);
+	seq = le16_to_cpu(wil_rx_status_get_seq(wil, msg));
+	vif = wil->vifs[mid];
+
+	if (unlikely(!vif)) {
+		wil_dbg_txrx(wil, "amsdu with invalid mid %d", mid);
+		return -EAGAIN;
+	}
+
+	if (unlikely(sta->amsdu_drop)) {
+		if (sta->amsdu_drop_sn == seq && sta->amsdu_drop_tid == tid) {
+			wil_dbg_txrx(wil, "Drop AMSDU sub frame, sn=%d\n",
+				     seq);
+			return -EAGAIN;
+		}
+
+		/* previous AMSDU finished - clear drop amsdu flag */
+		sta->amsdu_drop = 0;
+	}
+
+	da = wil_skb_get_da(skb);
+	/* for all sub frame of the AMSDU, check that the SA or DA are valid
+	 * compared with client/AP mac addresses
+	 */
+	switch (vif->wdev.iftype) {
+	case NL80211_IFTYPE_STATION:
+	case NL80211_IFTYPE_P2P_CLIENT:
+		/* check if the MSDU (a sub-frame of AMSDU) is multicast */
+		if (is_multicast_ether_addr(da))
+			return 0;
+
+		/* check if the current AMSDU (MPDU) frame is a multicast.
+		 * If so we have unicast sub frame as part of a multicast
+		 * AMSDU. Current frame and all sub frames should be dropped.
+		 */
+		if (wil_rx_status_get_mcast(msg)) {
+			wil_dbg_txrx(wil,
+				     "Found unicast sub frame in a multicast mpdu. Drop it\n");
+			goto out;
+		}
+
+		/* On client side, DA should be the client mac address */
+		ndev = vif_to_ndev(vif);
+		if (ether_addr_equal(ndev->dev_addr, da))
+			return 0;
+		break;
+
+	case NL80211_IFTYPE_P2P_GO:
+	case NL80211_IFTYPE_AP:
+		sa = wil_skb_get_sa(skb);
+		/* On AP side, the packet SA should be the client mac address.
+		 * check also the DA is not rfc 1042 header
+		 */
+		if (ether_addr_equal(sta->addr, sa) &&
+		    !ether_addr_equal(rfc1042_header, da))
+			return 0;
+		break;
+	default:
+		return 0;
+	}
+
+out:
+	sta->amsdu_drop_sn = seq;
+	sta->amsdu_drop_tid = tid;
+	sta->amsdu_drop = 1;
+	wil_dbg_txrx(wil,
+		     "Drop AMSDU frame, sn=%d tid=%d. Drop this and all next sub frames\n",
+		     seq, tid);
+
+	return -EAGAIN;
+}
+
 /* This function is used only for RX SW reorder */
 static int wil_check_bar(struct wil6210_priv *wil, void *msg, int cid,
 			 struct sk_buff *skb, struct wil_net_stats *stats)
@@ -1159,6 +1257,12 @@ skipping:
 	wil_hex_dump_txrx("Rx ", DUMP_PREFIX_OFFSET, 16, 1,
 			  skb->data, skb_headlen(skb), false);
 
+	if (!wil->use_compressed_rx_status &&
+	    wil_check_amsdu(wil, msg, cid, rxdata, skb)) {
+		kfree_skb(skb);
+		goto again;
+	}
+
 	/* use radiotap header only if required */
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP)
 		wil_rx_add_radiotap_header_edma(wil, msg, skb);
@@ -1268,6 +1372,26 @@ wil_get_next_tx_status_msg(struct wil_status_ring *sring, u8 *dr_bit,
 	*msg = *_msg;
 }
 
+static inline void wil_dump_tx_status(struct wil6210_priv *wil,
+				      struct wil_ring_tx_status *msg)
+{
+	wil_err(wil,
+		"Status Msg: num_desc: %d, ring_id: %d, status: %d, desc_ready: %d, timestamp: 0x%x, d2: 0x%x, seq_num: 0x%x, w7: 0x%x\n",
+		msg->num_descriptors, msg->ring_id, msg->status,
+		msg->desc_ready, msg->timestamp, msg->d2, msg->seq_number,
+		msg->w7);
+}
+
+static inline void
+wil_tx_latency_calc_edma(struct wil6210_priv *wil,
+			 struct sk_buff *skb,
+			 struct wil_sta_info *sta,
+			 struct wil_ring_tx_status *msg)
+{
+	if (wil_tx_latency_calc_common(wil, skb, sta))
+		wil_dump_tx_status(wil, msg);
+}
+
 /**
  * Clean up transmitted skb's from the Tx descriptor RING.
  * Return number of descriptors cleared.
@@ -1371,11 +1495,16 @@ int wil_tx_sring_handler(struct wil6210_priv *wil,
 					ndev->stats.tx_packets++;
 					ndev->stats.tx_bytes += skb->len;
 					if (stats) {
+						struct wil_sta_info *sta;
+
 						stats->tx_packets++;
 						stats->tx_bytes += skb->len;
+						sta = &wil->sta[cid];
 
-						wil_tx_latency_calc(wil, skb,
-							&wil->sta[cid]);
+						wil_tx_latency_calc_edma(wil,
+									 skb,
+									 sta,
+									 &msg);
 					}
 				} else {
 					ndev->stats.tx_errors++;

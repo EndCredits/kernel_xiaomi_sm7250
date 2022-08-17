@@ -315,6 +315,15 @@ config QCOM_MEMORY_DUMP_V2
 	  of deadlocks or cpu hangs these dump regions are captured to
 	  give a snapshot of the system at the time of the crash.
 
+config MSM_DEBUG_LAR_UNLOCK
+	bool "MSM Debug LAR Unlock Support"
+	depends on QCOM_MEMORY_DUMP_V2
+	help
+	  This allows unlocking Core Debug lock to allow capture
+	  of upper 32 bits of program counter at the time of
+	  system crash. This is useful in getting correct crash
+	  location.
+
 config QCOM_SMEM_STATE
 	bool
 
@@ -407,7 +416,7 @@ config MSM_REMOTEQDSS
 	  /sys/class/remoteqdss.
 
 config MSM_TZ_SMMU
-	depends on ARCH_MSM8953 || ARCH_QCS405
+	depends on ARCH_MSM8953 || ARCH_QCS405 || ARCH_MSM8917 || ARCH_MSM8937
 	bool "Helper functions for SMMU configuration through TZ"
 	help
 	  Say 'Y' here for targets that need to call into TZ to configure
@@ -806,6 +815,13 @@ config QTI_L2_REUSE
 	  to let the power collapsed cluster's L2 cache usage by the active
 	  cluster cpu. Use sysfs interface to control enabling this feature.
 
+config QCOM_DCC
+	bool "QCOM Data Capture and Compare engine support"
+	help
+	  This option enables driver for Data Capture and Compare engine. DCC
+	  driver provides interface to configure DCC block and read back
+	  captured data from DCC's internal SRAM.
+
 config QTI_RPM_STATS_LOG
 	bool "Qualcomm Technologies RPM Stats Driver"
 	depends on QCOM_RPMH || MSM_RPM_SMD
@@ -904,6 +920,16 @@ config QTI_CRYPTO_TZ
 	 performing hardware based file encryption. This means keys are
 	 programmed and managed through SCM calls to TZ where ICE driver
 	 will configure keys.
+
+config MSM_BAM_DMUX
+	bool "BAM Data Mux Driver"
+	depends on SPS
+	help
+	 Support Muxed Data Channels over BAM interface.
+	 BAM has a limited number of pipes.  This driver
+	 provides a means to support more logical channels
+	 via muxing than BAM could without muxing.
+
 endmenu
 
 config QCOM_HYP_CORE_CTL
@@ -959,3 +985,5 @@ config DEBUG_POLICY_STATUS
 	default y
 	help
 	  This driver read debug policy status using Qualcomm scm_call2 interface
+	  
+source "drivers/soc/qcom/wcnss/Kconfig"

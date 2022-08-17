@@ -635,6 +635,17 @@ static int ipa_create_ap_smmu_mapping_sgt(struct sg_table *sgt,
 		start_iova = va;
 	}
 
+	/*
+	 * In IPA4.5, GSI HW has such requirement:
+	 * Lower 16_bits of Ring base + ring length can’t exceed 16 bits
+	 */
+	if (ipa3_ctx->ipa_hw_type == IPA_HW_v4_5 &&
+		((u32)(va & IPA_LOW_16_BIT_MASK) + len) >=
+		IPA4_5_GSI_RING_SIZE_ALIGN) {
+		va = roundup(cb->next_addr, IPA4_5_GSI_RING_SIZE_ALIGN);
+		start_iova = va;
+	}
+
 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
 		/* directly get sg_tbl PA from wlan-driver */
 		phys = sg->dma_address;
@@ -742,6 +753,7 @@ static void ipa_release_ap_smmu_mappings(enum ipa_client_type client)
 				ipa3_ctx->wdi_map_cnt--;
 			}
 			kfree(wdi_res[i].res);
+			wdi_res[i].res = NULL;
 			wdi_res[i].valid = false;
 		}
 	}
@@ -778,6 +790,7 @@ static void ipa_release_uc_smmu_mappings(enum ipa_client_type client)
 				ipa3_ctx->wdi_map_cnt--;
 			}
 			kfree(wdi_res[i].res);
+			wdi_res[i].res = NULL;
 			wdi_res[i].valid = false;
 		}
 	}
@@ -929,6 +942,7 @@ void ipa3_release_wdi3_gsi_smmu_mappings(u8 dir)
 				ipa3_ctx->wdi_map_cnt--;
 			}
 			kfree(wdi_res[i].res);
+			wdi_res[i].res = NULL;
 			wdi_res[i].valid = false;
 		}
 	}
@@ -2632,23 +2646,25 @@ int ipa3_suspend_gsi_wdi_pipe(u32 clnt_hdl)
 	}
 	if (ep->valid) {
 		IPADBG("suspended pipe %d\n", ipa_ep_idx);
-		source_pipe_bitmask = 1 <<
-			ipa3_get_ep_mapping(ep->client);
-		res = ipa3_enable_force_clear(clnt_hdl,
-				false, source_pipe_bitmask);
-		if (res) {
-			/*
-			 * assuming here modem SSR, AP can remove
-			 * the delay in this case
-			 */
-			IPAERR("failed to force clear %d\n", res);
-			IPAERR("remove delay from SCND reg\n");
-			ep_ctrl_scnd.endp_delay = false;
-			ipahal_write_reg_n_fields(
+		if (IPA_CLIENT_IS_PROD(ep->client)) {
+			source_pipe_bitmask = 1 <<
+				ipa3_get_ep_mapping(ep->client);
+			res = ipa3_enable_force_clear(clnt_hdl,
+					false, source_pipe_bitmask);
+			if (res) {
+				/*
+				 * assuming here modem SSR, AP can remove
+				 * the delay in this case
+				 */
+				IPAERR("failed to force clear %d\n", res);
+				IPAERR("remove delay from SCND reg\n");
+				ep_ctrl_scnd.endp_delay = false;
+				ipahal_write_reg_n_fields(
 					IPA_ENDP_INIT_CTRL_SCND_n, clnt_hdl,
-					&ep_ctrl_scnd);
-		} else {
-			disable_force_clear = true;
+						&ep_ctrl_scnd);
+			} else {
+				disable_force_clear = true;
+			}
 		}
 retry_gsi_stop:
 		res = ipa3_stop_gsi_channel(ipa_ep_idx);

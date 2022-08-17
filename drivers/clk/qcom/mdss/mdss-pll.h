@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2013-2020, The Linux Foundation. All rights reserved. */
+/* Copyright (c) 2013-2021, The Linux Foundation. All rights reserved. */
 
 #ifndef __MDSS_PLL_H
 #define __MDSS_PLL_H
@@ -53,11 +53,18 @@ enum {
 };
 
 #define DFPS_MAX_NUM_OF_FRAME_RATES 16
+#ifdef CONFIG_FB_MSM_MDSS
+#define PLL_TRIM_CODES_SIZE 2
+#else
+#define PLL_TRIM_CODES_SIZE 3
+#endif
 
 struct dfps_pll_codes {
 	uint32_t pll_codes_1;
 	uint32_t pll_codes_2;
+#ifndef CONFIG_FB_MSM_MDSS
 	uint32_t pll_codes_3;
+#endif
 };
 
 struct dfps_codes_info {
@@ -139,11 +146,12 @@ struct mdss_pll_resources {
 	 * feature is disabled.
 	 */
 	bool		handoff_resources;
+	bool		cont_splash_enabled;
 
 	/*
 	 * caching the pll trim codes in the case of dynamic refresh
 	 */
-	int		cache_pll_trim_codes[3];
+	int		cache_pll_trim_codes[PLL_TRIM_CODES_SIZE];
 
 	/*
 	 * for maintaining the status of saving trim codes
@@ -211,12 +219,14 @@ static inline bool is_gdsc_disabled(struct mdss_pll_resources *pll_res)
 		WARN(1, "gdsc_base register is not defined\n");
 		return true;
 	}
-	if (pll_res->target_id == MDSS_PLL_TARGET_SDM660)
+	if ((pll_res->target_id == MDSS_PLL_TARGET_SDM660) ||
+			(pll_res->pll_interface_type == MDSS_DSI_PLL_28LPM) ||
+			(pll_res->pll_interface_type == MDSS_DSI_PLL_12NM))
 		ret = ((readl_relaxed(pll_res->gdsc_base + 0x4) & BIT(31)) &&
 		(!(readl_relaxed(pll_res->gdsc_base) & BIT(0)))) ? false : true;
 	else
 		ret = readl_relaxed(pll_res->gdsc_base) & BIT(31) ?
-			 false : true;
+			false : true;
 	return ret;
 }
 

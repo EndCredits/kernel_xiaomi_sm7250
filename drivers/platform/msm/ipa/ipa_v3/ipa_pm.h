@@ -13,7 +13,7 @@
 #define IPA_PM_MAX_EX_CL 64
 #define IPA_PM_THRESHOLD_MAX 5
 #define IPA_PM_EXCEPTION_MAX 5
-#define IPA_PM_DEFERRED_TIMEOUT 10
+#define IPA_PM_DEFERRED_TIMEOUT 100
 
 /*
  * ipa_pm group names
@@ -179,12 +179,12 @@ static inline int ipa_pm_exceptions_stat(char *buf, int size)
 	return -EPERM;
 }
 
-static inline int ipa_pm_add_dummy_clients(s8 power_plan);
+static inline int ipa_pm_add_dummy_clients(s8 power_plan)
 {
 	return -EPERM;
 }
 
-static inline int ipa_pm_remove_dummy_clients(void);
+static inline int ipa_pm_remove_dummy_clients(void)
 {
 	return -EPERM;
 }

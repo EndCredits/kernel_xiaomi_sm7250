@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2008-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -376,6 +376,8 @@ static int diagchar_open(struct inode *inode, struct file *file)
 		if (driver->ref_count == 0)
 			diag_mempool_init();
 		driver->ref_count++;
+		DIAG_LOG(DIAG_DEBUG_USERSPACE,
+		"diag: open successful for client pid: %d\n", current->tgid);
 		mutex_unlock(&driver->diagchar_mutex);
 		return 0;
 	}
@@ -2390,6 +2392,8 @@ int diag_query_pd(char *process_name)
 		return PERIPHERAL_CDSP;
 	if (diag_query_pd_name(process_name, "npu/root_pd"))
 		return PERIPHERAL_NPU;
+	if (diag_query_pd_name(process_name, "wpss/root_pd"))
+		return PERIPHERAL_WCNSS;
 	if (diag_query_pd_name(process_name, "wlan_pd"))
 		return UPD_WLAN;
 	if (diag_query_pd_name(process_name, "audio_pd"))
@@ -3792,6 +3796,9 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 
 	if (driver->data_ready[index] & MSG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
+		DIAG_LOG(DIAG_DEBUG_MASKS,
+		"diag: msg masks update to client pid: %d\n", current->tgid);
+
 		data_type = driver->data_ready[index] & MSG_MASKS_TYPE;
 		mutex_unlock(&driver->diagchar_mutex);
 		mutex_lock(&driver->md_session_lock);
@@ -3813,11 +3820,19 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 		mutex_lock(&driver->diagchar_mutex);
 		driver->data_ready[index] ^= MSG_MASKS_TYPE;
 		atomic_dec(&driver->data_ready_notif[index]);
+
+		DIAG_LOG(DIAG_DEBUG_MASKS,
+		"diag: msg masks update complete for client pid: %d\n",
+		current->tgid);
+
 		goto exit;
 	}
 
 	if (driver->data_ready[index] & EVENT_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
+		DIAG_LOG(DIAG_DEBUG_MASKS,
+		"diag: event masks update to client pid: %d\n", current->tgid);
+
 		data_type = driver->data_ready[index] & EVENT_MASKS_TYPE;
 		mutex_unlock(&driver->diagchar_mutex);
 		mutex_lock(&driver->md_session_lock);
@@ -3850,11 +3865,19 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 		mutex_lock(&driver->diagchar_mutex);
 		driver->data_ready[index] ^= EVENT_MASKS_TYPE;
 		atomic_dec(&driver->data_ready_notif[index]);
+
+		DIAG_LOG(DIAG_DEBUG_MASKS,
+		"diag: %s: event masks update complete for client pid: %d\n",
+		current->tgid);
+
 		goto exit;
 	}
 
 	if (driver->data_ready[index] & LOG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
+		DIAG_LOG(DIAG_DEBUG_MASKS,
+		"diag: log masks update to client pid: %d\n", current->tgid);
+
 		data_type = driver->data_ready[index] & LOG_MASKS_TYPE;
 		mutex_unlock(&driver->diagchar_mutex);
 		mutex_lock(&driver->md_session_lock);
@@ -3876,6 +3899,11 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 		mutex_lock(&driver->diagchar_mutex);
 		driver->data_ready[index] ^= LOG_MASKS_TYPE;
 		atomic_dec(&driver->data_ready_notif[index]);
+
+		DIAG_LOG(DIAG_DEBUG_MASKS,
+		"diag: log masks update complete for client pid: %d\n",
+		current->tgid);
+
 		goto exit;
 	}
 
@@ -3958,7 +3986,6 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 		goto exit;
 	}
 
-exit:
 	if (driver->data_ready[index] & DCI_DATA_TYPE) {
 		data_type = driver->data_ready[index] & DCI_DATA_TYPE;
 		mutex_unlock(&driver->diagchar_mutex);
@@ -4028,7 +4055,9 @@ exit:
 		mutex_unlock(&driver->dci_mutex);
 		goto end;
 	}
+exit:
 	mutex_unlock(&driver->diagchar_mutex);
+	goto ret_end;
 end:
 	/*
 	 * Flush any read that is currently pending on DCI data and
@@ -4039,6 +4068,7 @@ end:
 		diag_ws_on_copy_complete(DIAG_WS_DCI);
 		flush_workqueue(driver->diag_dci_wq);
 	}
+ret_end:
 	return ret;
 }
 

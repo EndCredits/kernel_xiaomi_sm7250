@@ -79,11 +79,13 @@ void __init early_init_dt_setup_pureason_arch(unsigned long pu_reason)
 
 phys_addr_t __fdt_pointer __initdata;
 
+/* Vendor stub */
 unsigned int boot_reason;
-EXPORT_SYMBOL(boot_reason);
+EXPORT_SYMBOL_GPL(boot_reason);
 
+/* Vendor stub */
 unsigned int cold_boot;
-EXPORT_SYMBOL(cold_boot);
+EXPORT_SYMBOL_GPL(cold_boot);
 
 /*
  * Standard memory resources

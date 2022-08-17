@@ -104,8 +104,8 @@ static const struct parent_map mmcc_parent_map_1[] = {
 
 static const char * const mmcc_parent_names_1[] = {
 	"xo",
-	"dsi0pll_byte_clk_mux",
-	"dsi1pll_byte_clk_mux",
+	"dsi0_phy_pll_out_byteclk",
+	"dsi1_phy_pll_out_byteclk",
 	"core_bi_pll_test_se",
 };
 
@@ -198,8 +198,8 @@ static const struct parent_map mmcc_parent_map_6[] = {
 
 static const char * const mmcc_parent_names_6[] = {
 	"xo",
-	"dp_link_2x_clk_divsel_five",
-	"dp_vco_divided_clk_src_mux",
+	"dp_phy_pll_link_clk",
+	"dp_phy_pll_vco_div_clk",
 	"core_bi_pll_test_se",
 };
 
@@ -232,8 +232,8 @@ static const struct parent_map mmcc_parent_map_8[] = {
 
 static const char * const mmcc_parent_names_8[] = {
 	"xo",
-	"dsi0pll_pixel_clk_mux",
-	"dsi1pll_pixel_clk_mux",
+	"dsi0_phy_pll_out_dsiclk",
+	"dsi1_phy_pll_out_dsiclk",
 	"core_bi_pll_test_se",
 };
 
@@ -2798,7 +2798,7 @@ static struct clk_branch mmss_snoc_dvm_axi_clk = {
 
 static struct clk_branch mmss_video_ahb_clk = {
 	.halt_reg = 0x1030,
-	.halt_check = BRANCH_HALT,
+	.halt_check = BRANCH_HALT_VOTED,
 	.clkr = {
 		.enable_reg = 0x1030,
 		.enable_mask = BIT(0),

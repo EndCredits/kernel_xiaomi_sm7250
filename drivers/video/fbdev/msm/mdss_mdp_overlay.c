@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved. */
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved. */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -1507,6 +1507,12 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 			goto end;
 		}
 		mdss_hw_init(mdss_res);
+		/*
+		 * As splash is not enabled, disable EARLY_MAP setting which was
+		 * enabled through DT before first kickoff.
+		 */
+		mdss_smmu_set_attribute(MDSS_IOMMU_DOMAIN_UNSECURE,
+					 EARLY_MAP, 0);
 		mdss_iommu_ctrl(0);
 	}
 
@@ -2411,6 +2417,7 @@ static int __overlay_secure_ctrl(struct msm_fb_data_type *mfd)
 	if (mdp5_data->secure_transition_state == SECURE_TRANSITION_NONE)
 		return ret;
 
+	mutex_lock(&mfd->sd_lock);
 	/* Secure Display */
 	if (mdp5_data->secure_transition_state == SD_NON_SECURE_TO_SECURE) {
 		if (!mdss_get_sd_client_cnt()) {
@@ -2439,6 +2446,7 @@ static int __overlay_secure_ctrl(struct msm_fb_data_type *mfd)
 					MDP_SECURE_DISPLAY_OVERLAY_SESSION);
 			if (ret) {
 				pr_err("secure display enable fail:%d\n", ret);
+				mutex_unlock(&mfd->sd_lock);
 				return ret;
 			}
 		}
@@ -2455,6 +2463,7 @@ static int __overlay_secure_ctrl(struct msm_fb_data_type *mfd)
 					MDP_SECURE_DISPLAY_OVERLAY_SESSION);
 			if (ret) {
 				pr_err("secure display disable fail:%d\n", ret);
+				mutex_unlock(&mfd->sd_lock);
 				return ret;
 			}
 		}
@@ -2470,6 +2479,7 @@ static int __overlay_secure_ctrl(struct msm_fb_data_type *mfd)
 					MDP_SECURE_CAMERA_OVERLAY_SESSION);
 			if (ret) {
 				pr_err("secure camera enable fail:%d\n", ret);
+				mutex_unlock(&mfd->sd_lock);
 				return ret;
 			}
 		}
@@ -2486,6 +2496,7 @@ static int __overlay_secure_ctrl(struct msm_fb_data_type *mfd)
 					MDP_SECURE_CAMERA_OVERLAY_SESSION);
 			if (ret) {
 				pr_err("secure camera disable fail:%d\n", ret);
+				mutex_unlock(&mfd->sd_lock);
 				return ret;
 			}
 		}
@@ -2493,6 +2504,7 @@ static int __overlay_secure_ctrl(struct msm_fb_data_type *mfd)
 		mdp5_data->sc_enabled = 0;
 	}
 
+	mutex_unlock(&mfd->sd_lock);
 	MDSS_XLOG(ret);
 	return ret;
 }
@@ -4072,9 +4084,9 @@ static ssize_t msm_misr_en_show(struct device *dev,
 		pr_err("Invalid ctl structure\n");
 		return -EINVAL;
 	}
-
+#ifdef CONFIG_DEBUG_FS
 	ret = mdss_dump_misr_data(&buf, PAGE_SIZE);
-
+#endif
 	return ret;
 }
 
@@ -5887,7 +5899,7 @@ static int mdss_mdp_overlay_off(struct msm_fb_data_type *mfd)
 		pr_debug("cleaning up pipes on fb%d\n", mfd->index);
 		if (mdata->handoff_pending)
 			mdp5_data->allow_kickoff = true;
-
+		atomic_inc(&mfd->mdp_sync_pt_data.commit_cnt);
 		mdss_mdp_overlay_kickoff(mfd, NULL);
 	} else if (!mdss_mdp_ctl_is_power_on(mdp5_data->ctl)) {
 		if (mfd->panel_reconfig) {
