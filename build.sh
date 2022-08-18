@@ -12,7 +12,7 @@
 #  Add clang to your PATH before using this script.
 #
 
-LOCAL_VERSION_NUMBER=v1.0
+LOCAL_VERSION_NUMBER=Driftwood
 
 ARCH=arm64;
 CC=clang;
@@ -27,7 +27,7 @@ TARGET_KERNEL_FILE=arch/arm64/boot/Image;
 TARGET_KERNEL_DTB=arch/arm64/boot/dtb;
 TARGET_KERNEL_DTBO=arch/arm64/boot/dtbo.img
 TARGET_KERNEL_NAME=Kernel;
-TARGET_KERNEL_MOD_VERSION=$(make kernelversion);
+TARGET_KERNEL_MOD_VERSION=$(make kernelversion)-$LOCAL_VERSION_NUMBER;
 
 DEFCONFIG_PATH=arch/arm64/configs
 DEFCONFIG_NAME=vendor/picasso_user_defconfig;
