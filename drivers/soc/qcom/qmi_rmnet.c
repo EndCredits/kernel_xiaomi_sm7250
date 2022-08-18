@@ -1334,14 +1334,14 @@ static void qmi_rmnet_check_stats_2(struct work_struct *work)
 
 		/* Out of powersave */
 		if (dfc_qmap_set_powersave(0, 0, NULL))
-			return;
+			goto end;
 
 		qmi->ps_enabled = false;
 
 		if (rmnet_get_powersave_notif(real_work->port))
 			qmi_rmnet_ps_off_notify(real_work->port);
 
-		return;
+		goto end;
 	}
 
 	rmnet_get_packets(real_work->port, &rx, &tx);
@@ -1373,6 +1373,9 @@ static void qmi_rmnet_check_stats_2(struct work_struct *work)
 
 		return;
 	}
+end:
+	rcu_read_lock();
+	rcu_read_unlock();
 }
 
 static void qmi_rmnet_work_set_active(void *port, int status)
