@@ -65,7 +65,6 @@ struct step_chg_info {
 	bool			vbat_avg_based_step_chg;
 	bool			batt_missing;
 	bool			taper_fcc;
-	bool			jeita_fcc_scaling;
 	int			jeita_fcc_index;
 	int			jeita_fv_index;
 	int			jeita_ffc_fv_index;
@@ -73,10 +72,6 @@ struct step_chg_info {
 	int			dynamic_ffc_fv_index;
 	int			step_index;
 	int			get_config_retry_count;
-	int			jeita_last_update_temp;
-	int			jeita_fcc_scaling_temp_threshold[2];
-	long			jeita_max_fcc_ua;
-	long			jeita_fcc_step_size;
 
 	struct step_chg_cfg	*step_chg_config;
 	struct jeita_fcc_cfg	*jeita_fcc_config;
@@ -331,7 +326,6 @@ static int get_step_chg_jeita_setting_from_profile(struct step_chg_info *chip)
 		pr_err("max-fastchg-current-ma reading failed, rc=%d\n", rc);
 		return rc;
 	}
-	chip->jeita_max_fcc_ua = max_fcc_ma * 1000;
 
 	chip->taper_fcc = of_property_read_bool(profile_node, "qcom,taper-fcc");
 
