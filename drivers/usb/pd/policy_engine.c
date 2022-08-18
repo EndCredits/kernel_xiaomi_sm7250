@@ -391,6 +391,7 @@ struct usbpd {
 	struct workqueue_struct	*wq;
 	struct work_struct	sm_work;
 	struct work_struct	start_periph_work;
+	struct delayed_work	src_check_work;
 	struct work_struct	restart_host_work;
 	struct hrtimer		timer;
 	bool			sm_queued;
