@@ -76,7 +76,7 @@ enum hvdcp3_type {
 #define HVDCP3_CLASS_B_BUS_CURRENT_MA			2700
 #define HVDCP3_CLASS_A_BAT_CURRENT_MA			3800
 #define HVDCP3_CLASS_A_BUS_CURRENT_MA			2200
-#define MAX_THERMAL_LEVEL				10
+#define MAX_THERMAL_LEVEL				13
 /* jeita related */
 #define JEITA_WARM_THR					450
 #define JEITA_COOL_NOT_ALLOW_CP_THR			100
