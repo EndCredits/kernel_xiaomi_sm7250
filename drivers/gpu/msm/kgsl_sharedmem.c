@@ -183,7 +183,7 @@ imported_mem_show(struct kgsl_process_private *priv,
 		 * To avoid this situation, use a worker to put the refcount
 		 * on mem entry.
 		 */
-		kgsl_mem_entry_put_deferred(entry);
+		kgsl_mem_entry_put(entry);
 		spin_lock(&priv->mem_lock);
 	}
 	spin_unlock(&priv->mem_lock);

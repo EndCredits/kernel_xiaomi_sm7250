@@ -356,7 +356,7 @@ static void kgsl_destroy_anon(struct kgsl_memdesc *memdesc)
 	}
 }
 
-static void kgsl_mem_entry_destroy(struct kref *kref)
+void kgsl_mem_entry_destroy(struct kref *kref)
 {
 	struct kgsl_mem_entry *entry = container_of(kref,
 						    struct kgsl_mem_entry,
@@ -4711,8 +4711,7 @@ kgsl_gpumem_vm_close(struct vm_area_struct *vma)
 
 	if (!entry)
 		return;
-
-	entry->memdesc.useraddr = 0;
+		
 	/*
 	 * Remove the memdesc from the mapped stat once all the mappings have
 	 * gone away
