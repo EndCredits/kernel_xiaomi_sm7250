@@ -1375,9 +1375,6 @@ static void qmi_rmnet_check_stats_2(struct work_struct *work)
 	}
 end:
 	rcu_read_lock();
-	if (!rmnet_work_quit)
-		alarm_start_relative(&real_work->atimer, PS_INTERVAL_KT);
-
 	rcu_read_unlock();
 }
 
