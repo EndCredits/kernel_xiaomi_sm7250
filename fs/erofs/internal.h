@@ -552,8 +552,10 @@ static inline int z_erofs_load_lzma_config(struct super_block *sb,
 
 #define EFSCORRUPTED    EUCLEAN         /* Filesystem is corrupted */
 
-#ifndef lru_to_page
-#define lru_to_page(head) (list_entry((head)->prev, struct page, lru))
+#ifdef CONFIG_HIGHMEM
+#else
+static inline void *kmap_local_page(struct page *page) { return page_address(page); }
+static inline void kunmap_local(const void *vaddr) {}
 #endif
 
 #endif	/* __EROFS_INTERNAL_H */
