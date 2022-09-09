@@ -387,7 +387,6 @@ struct usbpd {
 	struct workqueue_struct	*wq;
 	struct work_struct	sm_work;
 	struct work_struct	start_periph_work;
-	struct work_struct	disable_active_work;
 	struct delayed_work	src_check_work;
 	struct work_struct	restart_host_work;
 
@@ -416,6 +415,7 @@ struct usbpd {
 	bool			peer_usb_comm;
 	bool			peer_pr_swap;
 	bool			peer_dr_swap;
+	bool			no_usb3dp_concurrency;
 
 	u32			sink_caps[7];
 	int			num_sink_caps;
@@ -638,24 +638,6 @@ static void start_usb_peripheral_work(struct work_struct *w)
 		pd->partner_desc.accessory = TYPEC_ACCESSORY_NONE;
 		pd->partner = typec_register_partner(pd->typec_port,
 				&pd->partner_desc);
-	}
-}
-
-static void usbpd_disable_cp(struct usbpd *pd)
-{
-	queue_work(pd->wq, &pd->disable_active_work);
-}
-
-static void usbpd_disable_active_work(struct work_struct *w)
-{
-	struct usbpd *pd = container_of(w, struct usbpd, disable_active_work);
-	union power_supply_propval val = {0};
-
-	usbpd_dbg(&pd->dev, "batt_2s :%d\n", pd->batt_2s);
-	if (pd->batt_2s) {
-		usbpd_dbg(&pd->dev, "send cp disable and arti vbus disable");
-		power_supply_set_property(pd->usb_psy,
-				POWER_SUPPLY_PROP_PD_ACTIVE, &val);
 	}
 }
 
@@ -5472,7 +5454,6 @@ struct usbpd *usbpd_create(struct device *parent)
 	}
 	INIT_WORK(&pd->sm_work, usbpd_sm);
 	INIT_WORK(&pd->start_periph_work, start_usb_peripheral_work);
-	INIT_WORK(&pd->pdo_work, usbpd_pdo_workfunc);
 	INIT_DELAYED_WORK(&pd->src_check_work, source_check_workfunc);
 
 	hrtimer_init(&pd->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -5545,7 +5526,7 @@ struct usbpd *usbpd_create(struct device *parent)
 			pd->pd_vbus_max_limit = PD_VBUS_MAX_VOLTAGE_LIMIT;
 		}
 	}
-	
+
 	pd->non_qcom_pps_ctr = of_property_read_bool(parent->of_node,
 				"mi,non-qcom-pps-ctrl");
 
