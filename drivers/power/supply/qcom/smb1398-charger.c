@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  * Copyright (C) 2021 XiaoMi, Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "SMB1398: %s: " fmt, __func__
@@ -262,6 +263,7 @@
 #define COMBO_PRE_REGULATOR		2
 #define SMB1394_DIV2_CP_PRY		3
 #define SMB1394_DIV2_CP_SECY		4
+#define SMB1398_MAX_IIN			5000
 
 #define IS_SMB1394(role) \
 	(role == SMB1394_DIV2_CP_PRY || role == SMB1394_DIV2_CP_SECY)
