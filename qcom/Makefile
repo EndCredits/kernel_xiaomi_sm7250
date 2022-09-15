@@ -18,6 +18,7 @@ kona-mtp-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
 kona-mtp-ws-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
 kona-sa-mtp-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
 kona-xr-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
+kona-xr-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
 kona-rumi-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
 kona-qrd-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
 kona-xrfusion-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
@@ -52,13 +53,17 @@ dtb-$(CONFIG_ARCH_KONA) += kona-rumi.dtb \
 	kona-v2.1-xrfusion.dtb \
 	kona-v2.1-xrfusion-ult.dtb \
         qrb5165-iot-rb5.dtb \
-        kona-v2.1-iot-rb5.dtb
+        kona-v2.1-iot-rb5.dtb \
+        kona-v2.1-hdk.dtb
 endif
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtbo-$(CONFIG_ARCH_LITO) += lito-rumi-overlay.dtbo \
                 lito-mtp-overlay.dtbo \
                 lito-v2-mtp-overlay.dtbo \
+                vangogh-sm7250-overlay.dtbo \
+                picasso-sm7250-overlay.dtbo \
+                monet-sm7250-overlay.dtbo \
                 lito-cdp-overlay.dtbo \
                 lito-v2-cdp-overlay.dtbo \
                 lito-atp-overlay.dtbo \
@@ -79,11 +84,17 @@ lito-v2-atp-overlay.dtbo-base := lito-v2.dtb
 lito-v2-atp-lcd-overlay.dtbo-base := lito-v2.dtb
 lito-qrd-overlay.dtbo-base := lito.dtb
 lito-v2-qrd-overlay.dtbo-base := lito-v2.dtb
+vangogh-sm7250-overlay.dtbo-base := lito.dtb lito-v2.dtb
+picasso-sm7250-overlay.dtbo-base := lito.dtb lito-v2.dtb
+monet-sm7250-overlay.dtbo-base := lito.dtb lito-v2.dtb
 orchid-mtp-overlay.dtbo-base := orchid.dtb
 orchid-cdp-overlay.dtbo-base := orchid.dtb
 else
 dtb-$(CONFIG_ARCH_LITO) += lito-rumi.dtb \
                 lito-mtp.dtb \
+                vangogh-sm7250.dtb \
+                picasso-sm7250.dtb \
+                monet-sm7250.dtb \
                 lito-cdp.dtb \
                 lito-atp.dtb \
                 lito-qrd.dtb \
