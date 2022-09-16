@@ -76,28 +76,8 @@ repeat:
 struct erofs_workgroup *erofs_insert_workgroup(struct super_block *sb,
 			     struct erofs_workgroup *grp)
 {
-	struct erofs_sb_info *sbi;
-	struct erofs_workgroup *ret;
+	struct erofs_sb_info *const sbi = EROFS_SB(sb);
 	int err;
-
-	err = radix_tree_preload(GFP_NOFS);
-	if (err)
-		return ERR_PTR(err);
-
-	sbi = EROFS_SB(sb);
-
-repeat:
-	xa_lock(&sbi->workstn_tree);
-	ret = radix_tree_lookup(&sbi->workstn_tree, grp->index);
-	if (ret) {
-		if (erofs_workgroup_get(ret)) {
-			xa_unlock(&sbi->workstn_tree);
-			cond_resched();
-			goto repeat;
-		}
-		DBG_BUGON(ret->index != grp->index);
-		goto out_unlock;
-	}
 
 	/*
 	 * Bump up reference count before making this workgroup
@@ -106,6 +86,7 @@ repeat:
 	 */
 	atomic_inc(&grp->refcount);
 
+	xa_lock(&sbi->workstn_tree);
 	err = radix_tree_insert(&sbi->workstn_tree, grp->index, grp);
 	if (err) {
 		/*
@@ -113,14 +94,14 @@ repeat:
 		 * and refcount >= 2 (cannot be freezed).
 		 */
 		atomic_dec(&grp->refcount);
-		ret = ERR_PTR(err);
-	} else
-		ret = grp;
 
-out_unlock:
+		if (err == -EEXIST)
+			grp = erofs_find_workgroup(sb, grp->index);
+		else 
+			grp = ERR_PTR(err);
+	}
 	xa_unlock(&sbi->workstn_tree);
-	radix_tree_preload_end();
-	return ret;
+	return grp;
 }
 
 static void  __erofs_workgroup_free(struct erofs_workgroup *grp)
