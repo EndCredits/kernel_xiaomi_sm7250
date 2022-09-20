@@ -66,7 +66,7 @@ static ssize_t min_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	err = kstrtoul(buf, 0, &min);
 	if (err)
-		return -EINVAL;
+		return err;
 
 	range->min = min;
 	return count;
@@ -91,7 +91,7 @@ static ssize_t max_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	err = kstrtoul(buf, 0, &max);
 	if (err)
-		return -EINVAL;
+		return err;
 
 	range->max = max;
 	return count;
@@ -297,9 +297,7 @@ static ssize_t interval_us_store(struct kobject *kobj,
 			struct damon_sysfs_watermarks, kobj);
 	int err = kstrtoul(buf, 0, &watermarks->interval_us);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static ssize_t high_show(struct kobject *kobj,
@@ -318,9 +316,7 @@ static ssize_t high_store(struct kobject *kobj,
 			struct damon_sysfs_watermarks, kobj);
 	int err = kstrtoul(buf, 0, &watermarks->high);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static ssize_t mid_show(struct kobject *kobj,
@@ -339,9 +335,7 @@ static ssize_t mid_store(struct kobject *kobj,
 			struct damon_sysfs_watermarks, kobj);
 	int err = kstrtoul(buf, 0, &watermarks->mid);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static ssize_t low_show(struct kobject *kobj,
@@ -360,9 +354,7 @@ static ssize_t low_store(struct kobject *kobj,
 			struct damon_sysfs_watermarks, kobj);
 	int err = kstrtoul(buf, 0, &watermarks->low);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static void damon_sysfs_watermarks_release(struct kobject *kobj)
@@ -442,9 +434,7 @@ static ssize_t sz_permil_store(struct kobject *kobj,
 			struct damon_sysfs_weights, kobj);
 	int err = kstrtouint(buf, 0, &weights->sz);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static ssize_t nr_accesses_permil_show(struct kobject *kobj,
@@ -463,9 +453,7 @@ static ssize_t nr_accesses_permil_store(struct kobject *kobj,
 			struct damon_sysfs_weights, kobj);
 	int err = kstrtouint(buf, 0, &weights->nr_accesses);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static ssize_t age_permil_show(struct kobject *kobj,
@@ -484,9 +472,7 @@ static ssize_t age_permil_store(struct kobject *kobj,
 			struct damon_sysfs_weights, kobj);
 	int err = kstrtouint(buf, 0, &weights->age);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static void damon_sysfs_weights_release(struct kobject *kobj)
@@ -1111,9 +1097,7 @@ static ssize_t start_store(struct kobject *kobj, struct kobj_attribute *attr,
 			struct damon_sysfs_region, kobj);
 	int err = kstrtoul(buf, 0, &region->start);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static ssize_t end_show(struct kobject *kobj, struct kobj_attribute *attr,
@@ -1132,9 +1116,7 @@ static ssize_t end_store(struct kobject *kobj, struct kobj_attribute *attr,
 			struct damon_sysfs_region, kobj);
 	int err = kstrtoul(buf, 0, &region->end);
 
-	if (err)
-		return -EINVAL;
-	return count;
+	return err ? err : count;
 }
 
 static void damon_sysfs_region_release(struct kobject *kobj)
@@ -1524,7 +1506,7 @@ static ssize_t sample_us_store(struct kobject *kobj,
 	int err = kstrtoul(buf, 0, &us);
 
 	if (err)
-		return -EINVAL;
+		return err;
 
 	intervals->sample_us = us;
 	return count;
@@ -1548,7 +1530,7 @@ static ssize_t aggr_us_store(struct kobject *kobj, struct kobj_attribute *attr,
 	int err = kstrtoul(buf, 0, &us);
 
 	if (err)
-		return -EINVAL;
+		return err;
 
 	intervals->aggr_us = us;
 	return count;
@@ -1572,7 +1554,7 @@ static ssize_t update_us_store(struct kobject *kobj,
 	int err = kstrtoul(buf, 0, &us);
 
 	if (err)
-		return -EINVAL;
+		return err;
 
 	intervals->update_us = us;
 	return count;
