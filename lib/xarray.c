@@ -247,9 +247,23 @@ void *xas_load(struct xa_state *xas)
 }
 EXPORT_SYMBOL_GPL(xas_load);
 
-/* Move the radix tree node cache here */
 extern struct kmem_cache *radix_tree_node_cachep;
-extern void radix_tree_node_rcu_free(struct rcu_head *head);
+static void xa_node_rcu_free(struct rcu_head *head)
+{
+	struct xa_node *node =
+			container_of(head, struct xa_node, rcu_head);
+
+	/*
+	 * Must only free zeroed nodes into the slab.  We can be left with
+	 * non-NULL entries by radix_tree_free_nodes, so clear the entries
+	 * and tags here.
+	 */
+	memset(node->slots, 0, sizeof(node->slots));
+	memset(node->tags, 0, sizeof(node->tags));
+	INIT_LIST_HEAD(&node->private_list);
+
+	kmem_cache_free(radix_tree_node_cachep, node);
+}
 
 #define XA_RCU_FREE	((struct xarray *)1)
 
@@ -257,7 +271,7 @@ static void xa_node_free(struct xa_node *node)
 {
 	XA_NODE_BUG_ON(node, !list_empty(&node->private_list));
 	node->array = XA_RCU_FREE;
-	call_rcu(&node->rcu_head, radix_tree_node_rcu_free);
+	call_rcu(&node->rcu_head, xa_node_rcu_free);
 }
 
 /*
@@ -274,7 +288,7 @@ void xas_destroy(struct xa_state *xas)
 	while (node) {
 		XA_NODE_BUG_ON(node, !list_empty(&node->private_list));
 		next = rcu_dereference_raw(node->parent);
-		radix_tree_node_rcu_free(&node->rcu_head);
+		xa_node_rcu_free(&node->rcu_head);
 		xas->xa_alloc = node = next;
 	}
 }
