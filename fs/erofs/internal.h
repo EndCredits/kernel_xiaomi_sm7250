@@ -85,8 +85,8 @@ struct erofs_sb_info {
 	struct list_head list;
 	struct mutex umount_mutex;
 
-	/* the dedicated workstation for compression */
-	struct radix_tree_root workstn_tree;
+	/* managed XArray arranged in physical block number */
+	struct xarray managed_pslots;
 
 	/* threshold for decompression synchronously */
 	unsigned int max_sync_decompress_pages;
