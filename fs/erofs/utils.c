@@ -59,7 +59,7 @@ struct erofs_workgroup *erofs_find_workgroup(struct super_block *sb,
 
 repeat:
 	rcu_read_lock();
-	grp = radix_tree_lookup(&sbi->workstn_tree, index);
+	grp = xa_load(&sbi->managed_pslots, index);
 	if (grp) {
 		if (erofs_workgroup_get(grp)) {
 			/* prefer to relax rcu read side */
@@ -74,33 +74,35 @@ repeat:
 }
 
 struct erofs_workgroup *erofs_insert_workgroup(struct super_block *sb,
-			     struct erofs_workgroup *grp)
+					       struct erofs_workgroup *grp)
 {
 	struct erofs_sb_info *const sbi = EROFS_SB(sb);
-	int err;
+	struct erofs_workgroup *pre;
 
 	/*
-	 * Bump up reference count before making this workgroup
-	 * visible to other users in order to avoid potential UAF
-	 * without serialized by workstn_lock.
+	 * Bump up a reference count before making this visible
+	 * to others for the XArray in order to avoid potential
+	 * UAF without serialized by xa_lock.
 	 */
 	atomic_inc(&grp->refcount);
 
-	xa_lock(&sbi->workstn_tree);
-	err = radix_tree_insert(&sbi->workstn_tree, grp->index, grp);
-	if (err) {
-		/*
-		 * it's safe to decrease since the workgroup isn't visible
-		 * and refcount >= 2 (cannot be freezed).
-		 */
+repeat:
+	xa_lock(&sbi->managed_pslots);
+	pre = __xa_cmpxchg(&sbi->managed_pslots, grp->index,
+			   NULL, grp, GFP_NOFS);
+	if (pre) {
+		if (xa_is_err(pre)) {
+			pre = ERR_PTR(xa_err(pre));
+		} else if (erofs_workgroup_get(pre)) {
+			/* try to legitimize the current in-tree one */
+			xa_unlock(&sbi->managed_pslots);
+			cond_resched();
+			goto repeat;
+		}
 		atomic_dec(&grp->refcount);
-
-		if (err == -EEXIST)
-			grp = erofs_find_workgroup(sb, grp->index);
-		else 
-			grp = ERR_PTR(err);
+		grp = pre;
 	}
-	xa_unlock(&sbi->workstn_tree);
+	xa_unlock(&sbi->managed_pslots);
 	return grp;
 }
 
@@ -134,7 +136,7 @@ static bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
 
 	/*
 	 * Note that all cached pages should be unattached
-	 * before deleted from the radix tree. Otherwise some
+	 * before deleted from the XArray. Otherwise some
 	 * cached pages could be still attached to the orphan
 	 * old workgroup when the new one is available in the tree.
 	 */
@@ -148,7 +150,7 @@ static bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
 	 * however in order to avoid some race conditions, add a
 	 * DBG_BUGON to observe this in advance.
 	 */
-	DBG_BUGON(radix_tree_delete(&sbi->workstn_tree, grp->index) != grp);
+	DBG_BUGON(__xa_erase(&sbi->managed_pslots, grp->index) != grp);
 
 	/* last refcount should be connected with its managed pslot.  */
 	erofs_workgroup_unfreeze(grp, 0);
@@ -159,34 +161,23 @@ static bool erofs_try_to_release_workgroup(struct erofs_sb_info *sbi,
 static unsigned long erofs_shrink_workstation(struct erofs_sb_info *sbi,
 					      unsigned long nr_shrink)
 {
-	pgoff_t first_index = 0;
-	void *batch[PAGEVEC_SIZE];
+	struct erofs_workgroup *grp;
 	unsigned int freed = 0;
+	unsigned long index;
 
-	int i, found;
-repeat:
-	xa_lock(&sbi->workstn_tree);
-
-	found = radix_tree_gang_lookup(&sbi->workstn_tree,
-				       batch, first_index, PAGEVEC_SIZE);
-
-	for (i = 0; i < found; ++i) {
-		struct erofs_workgroup *grp = batch[i];
-
-		first_index = grp->index + 1;
-
+	xa_lock(&sbi->managed_pslots);
+	xa_for_each(&sbi->managed_pslots, index, grp) {
 		/* try to shrink each valid workgroup */
 		if (!erofs_try_to_release_workgroup(sbi, grp))
 			continue;
+		xa_unlock(&sbi->managed_pslots);
 
 		++freed;
 		if (!--nr_shrink)
-			break;
+			return freed;
+		xa_lock(&sbi->managed_pslots);
 	}
-	xa_unlock(&sbi->workstn_tree);
-
-	if (i && nr_shrink)
-		goto repeat;
+	xa_unlock(&sbi->managed_pslots);
 	return freed;
 }
 
@@ -225,8 +216,7 @@ void erofs_shrinker_unregister(struct super_block *sb)
 static unsigned long erofs_shrink_count(struct shrinker *shrink,
 					struct shrink_control *sc)
 {
-	long r = atomic_long_read(&erofs_global_shrink_cnt);
-	return r < 0 ? 0 : r;
+	return atomic_long_read(&erofs_global_shrink_cnt);
 }
 
 static unsigned long erofs_shrink_scan(struct shrinker *shrink,
