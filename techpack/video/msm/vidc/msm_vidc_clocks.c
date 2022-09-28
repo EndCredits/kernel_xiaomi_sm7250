@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include "msm_vidc_common.h"
@@ -274,7 +275,7 @@ static int fill_dynamic_stats(struct msm_vidc_inst *inst,
 	return 0;
 }
 
-int msm_comm_set_buses(struct msm_vidc_core *core, u32 sid, bool force_reset)
+int msm_comm_set_buses(struct msm_vidc_core *core, u32 sid)
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst = NULL;
@@ -306,18 +307,10 @@ int msm_comm_set_buses(struct msm_vidc_core *core, u32 sid, bool force_reset)
 		}
 		mutex_unlock(&inst->registeredbufs.lock);
 
-		if ((!filled_len || !device_addr) && !force_reset &&
+		if ((!filled_len || !device_addr) &&
 			(inst->session_type != MSM_VIDC_CVP)) {
 			s_vpr_l(sid, "%s: no input\n", __func__);
-			mutex_lock(&inst->eosbufs.lock);
-			if (list_empty(&inst->eosbufs.list) &&
-				!inst->in_flush && !inst->out_flush) {
-				s_vpr_l(sid, "%s:No pending eos/flush cmds\n",
-					     __func__);
-				mutex_unlock(&inst->eosbufs.lock);
-				continue;
-			}
-			mutex_unlock(&inst->eosbufs.lock);
+			continue;
 		}
 
 		/* skip inactive session bus bandwidth */
@@ -341,7 +334,7 @@ int msm_comm_set_buses(struct msm_vidc_core *core, u32 sid, bool force_reset)
 	return rc;
 }
 
-int msm_comm_vote_bus(struct msm_vidc_inst *inst, bool force_reset)
+int msm_comm_vote_bus(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct msm_vidc_core *core;
@@ -376,7 +369,7 @@ int msm_comm_vote_bus(struct msm_vidc_inst *inst, bool force_reset)
 	}
 	mutex_unlock(&inst->registeredbufs.lock);
 
-	if ((!filled_len || !device_addr) && !force_reset &&
+	if ((!filled_len || !device_addr) &&
 		(inst->session_type != MSM_VIDC_CVP)) {
 		s_vpr_l(inst->sid, "%s: no input\n", __func__);
 		return 0;
@@ -465,7 +458,7 @@ int msm_comm_vote_bus(struct msm_vidc_inst *inst, bool force_reset)
 		call_core_op(core, calc_bw, vote_data);
 	}
 
-	rc = msm_comm_set_buses(core, inst->sid, force_reset);
+	rc = msm_comm_set_buses(core, inst->sid);
 
 	return rc;
 }
@@ -885,7 +878,7 @@ static unsigned long msm_vidc_calc_freq_iris2(struct msm_vidc_inst *inst,
 	return (unsigned long) freq;
 }
 
-int msm_vidc_set_clocks(struct msm_vidc_core *core, u32 sid, bool force_reset)
+int msm_vidc_set_clocks(struct msm_vidc_core *core, u32 sid)
 {
 	struct hfi_device *hdev;
 	unsigned long freq_core_1 = 0, freq_core_2 = 0, rate = 0;
@@ -923,17 +916,9 @@ int msm_vidc_set_clocks(struct msm_vidc_core *core, u32 sid, bool force_reset)
 		}
 		mutex_unlock(&inst->registeredbufs.lock);
 
-		if ((!filled_len || !device_addr) && !force_reset) {
+		if (!filled_len || !device_addr) {
 			s_vpr_l(sid, "%s: no input\n", __func__);
-			mutex_lock(&inst->eosbufs.lock);
-			if (list_empty(&inst->eosbufs.list) && !inst->in_flush
-				&& !inst->out_flush) {
-				s_vpr_l(sid, "%s:No pending eos/flush cmds\n",
-					       __func__);
-				mutex_unlock(&inst->eosbufs.lock);
-				continue;
-			}
-			mutex_unlock(&inst->eosbufs.lock);
+			continue;
 		}
 
 		/* skip inactive session clock rate */
@@ -1004,7 +989,7 @@ int msm_vidc_set_clocks(struct msm_vidc_core *core, u32 sid, bool force_reset)
 	return rc;
 }
 
-int msm_comm_scale_clocks(struct msm_vidc_inst *inst, bool force_reset)
+int msm_comm_scale_clocks(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_buffer *temp, *next;
 	unsigned long freq = 0;
@@ -1029,7 +1014,7 @@ int msm_comm_scale_clocks(struct msm_vidc_inst *inst, bool force_reset)
 	}
 	mutex_unlock(&inst->registeredbufs.lock);
 
-	if ((!filled_len || !device_addr) && !force_reset) {
+	if (!filled_len || !device_addr) {
 		s_vpr_l(inst->sid, "%s: no input\n", __func__);
 		return 0;
 	}
@@ -1048,7 +1033,7 @@ int msm_comm_scale_clocks(struct msm_vidc_inst *inst, bool force_reset)
 		msm_dcvs_scale_clocks(inst, freq);
 	}
 
-	msm_vidc_set_clocks(inst->core, inst->sid, force_reset);
+	msm_vidc_set_clocks(inst->core, inst->sid);
 
 	return 0;
 }
@@ -1071,37 +1056,18 @@ int msm_comm_scale_clocks_and_bus(struct msm_vidc_inst *inst, bool do_bw_calc)
 		inst->active = true;
 	}
 
-	if (msm_comm_scale_clocks(inst, false)) {
+	if (msm_comm_scale_clocks(inst)) {
 		s_vpr_e(inst->sid,
 			"Failed to scale clocks. May impact performance\n");
 	}
 
 	if (do_bw_calc) {
-		if (msm_comm_vote_bus(inst, false)) {
+		if (msm_comm_vote_bus(inst)) {
 			s_vpr_e(inst->sid,
 				"Failed to scale DDR bus. May impact perf\n");
 		}
 	}
 
-	return 0;
-}
-
-int msm_comm_reset_clocks_and_bus(struct msm_vidc_inst *inst)
-{
-	if (!inst) {
-		d_vpr_e("%s: invalid params %pK\n", __func__, inst);
-		return -EINVAL;
-	}
-
-	if (msm_comm_scale_clocks(inst, true)) {
-		s_vpr_e(inst->sid,
-			"Failed to reset clocks. May impact performance\n");
-	}
-
-	if (msm_comm_vote_bus(inst, true)) {
-		s_vpr_e(inst->sid,
-			"Failed to reset DDR bus. May impact perf\n");
-	}
 	return 0;
 }
 
@@ -1786,12 +1752,8 @@ int msm_vidc_decide_core_and_power_mode_iris1(struct msm_vidc_inst *inst)
 		msm_vidc_move_core_to_power_save_mode(core,
 			VIDC_CORE_ID_1, inst->sid);
 	} else {
-		if (!is_realtime_session(inst)) {
-			s_vpr_h(inst->sid, "Supporting NRT session");
-		} else {
-			s_vpr_e(inst->sid, "Core cannot support this load\n");
-			return -EINVAL;
-		}
+		s_vpr_e(inst->sid, "Core cannot support this load\n");
+		return -EINVAL;
 	}
 
 	inst->clk_data.core_id = VIDC_CORE_ID_1;

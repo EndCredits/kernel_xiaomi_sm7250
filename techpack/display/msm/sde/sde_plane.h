@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -307,5 +308,11 @@ void sde_plane_setup_src_split_order(struct drm_plane *plane,
  * Returns: true if sys cache is required, otherwise false.
  */
 bool sde_plane_is_cache_required(struct drm_plane *plane);
+
+/*
+ * sde_plane_get_mi_layer_info - get mi layer info
+ * @plane: Pointer to DRM plane object
+ */
+uint32_t sde_plane_get_mi_layer_info(const struct drm_plane_state *drm_state);
 
 #endif /* _SDE_PLANE_H_ */

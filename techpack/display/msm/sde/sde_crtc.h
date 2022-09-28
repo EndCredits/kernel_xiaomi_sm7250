@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -34,22 +35,6 @@
 /* define the maximum number of in-flight frame events */
 /* Expand it to 2x for handling atleast 2 connectors safely */
 #define SDE_CRTC_FRAME_EVENT_SIZE	(4 * 2)
-
-/**
- * enum sde_session_type: session type
- * @SDE_SECURE_UI_SESSION:     secure UI usecase
- * @SDE_SECURE_CAMERA_SESSION: secure camera usecase
- * @SDE_SECURE_VIDEO_SESSION:  secure video usecase
- * @SDE_NON_SECURE_SESSION:    non secure usecase
- * @SDE_NULL_SESSION:          null commit usecase
- */
-enum sde_session_type {
-	SDE_SECURE_UI_SESSION,
-	SDE_SECURE_CAMERA_SESSION,
-	SDE_SECURE_VIDEO_SESSION,
-	SDE_NON_SECURE_SESSION,
-	SDE_NULL_SESSION,
-};
 
 /**
  * enum sde_crtc_client_type: crtc client type
@@ -237,13 +222,11 @@ struct sde_crtc_misr_info {
  * @debugfs_root  : Parent of debugfs node
  * @priv_handle   : Pointer to external private handle, if present
  * @vblank_cb_count : count of vblank callback since last reset
- * @retire_frame_event_time  : ktime at last retire frame event
  * @play_count    : frame count between crtc enable and disable
  * @vblank_cb_time  : ktime at vblank count reset
  * @vblank_last_cb_time  : ktime at last vblank notification
  * @sysfs_dev  : sysfs device node for crtc
  * @vsync_event_sf : vsync event notifier sysfs device
- * @retire_frame_event_sf :retire frame event notifier sysfs device
  * @enabled       : whether the SDE CRTC is currently enabled. updated in the
  *                  commit-thread, not state-swap time which is earlier, so
  *                  safe to make decisions on during VBLANK on/off work
@@ -276,8 +259,6 @@ struct sde_crtc_misr_info {
  * @cur_perf      : current performance committed to clock/bandwidth driver
  * @plane_mask_old: keeps track of the planes used in the previous commit
  * @frame_trigger_mode: frame trigger mode
- * @cp_pu_feature_mask: mask indicating cp feature enable for partial update
- * @cached_user_roi_list : Copy of user_roi_list from previous PU frame
  * @ltm_buffer_cnt  : number of ltm buffers
  * @ltm_buffers     : struct stores ltm buffer related data
  * @ltm_buf_free    : list of LTM buffers that are available
@@ -287,7 +268,6 @@ struct sde_crtc_misr_info {
  * @ltm_lock        : Spinlock to protect ltm buffer_cnt, hist_en and ltm lists
  * @needs_hw_reset  : Initiate a hw ctl reset
  * @comp_ratio      : Compression ratio
- * @dspp_blob_info  : blob containing dspp hw capability information
  */
 struct sde_crtc {
 	struct drm_crtc base;
@@ -316,12 +296,10 @@ struct sde_crtc {
 	u32 vblank_cb_count;
 	u64 play_count;
 	ktime_t vblank_cb_time;
-	ktime_t retire_frame_event_time;
 	ktime_t vblank_last_cb_time;
 	struct sde_crtc_fps_info fps_info;
 	struct device *sysfs_dev;
 	struct kernfs_node *vsync_event_sf;
-	struct kernfs_node *retire_frame_event_sf;
 	bool enabled;
 
 	bool ds_reconfig;
@@ -361,9 +339,6 @@ struct sde_crtc {
 	struct drm_property_blob *hist_blob;
 	enum frame_trigger_mode_type frame_trigger_mode;
 
-	u32 cp_pu_feature_mask;
-	struct msm_roi_list cached_user_roi_list;
-
 	u32 ltm_buffer_cnt;
 	struct sde_ltm_buffer *ltm_buffers[LTM_BUFFER_SIZE];
 	struct list_head ltm_buf_free;
@@ -375,11 +350,53 @@ struct sde_crtc {
 	bool needs_hw_reset;
 
 	int comp_ratio;
-
-	struct drm_property_blob *dspp_blob_info;
 };
 
 #define to_sde_crtc(x) container_of(x, struct sde_crtc, base)
+
+/**
+ * enum sde_crtc_mi_layer_type: type of mi layer
+ * @MI_LAYER_FOD_PRESSED_ICON: FOD touched icon layer
+ * @MI_LAYER_FOD_ICON: FOD untouch icon layer
+ * @MI_LAYER_AOD: AOD layer
+ */
+enum sde_crtc_mi_layer_type {
+	MI_LAYER_NULL = 0x0,
+	MI_LAYER_FOD_HBM_OVERLAY = 0x1,
+	MI_LAYER_FOD_ICON = 0x2,
+	MI_LAYER_AOD = 0x4,
+	MI_LAYER_MAX,
+};
+
+/**
+ * sde_crtc_mi_dc_backlight - mi dc backlight
+ * @mi_dc_bl_state: dc backlihgt state
+ * @mi_dc_backlight_level: last backlight stash
+ * @mi_dc_layer_alpha: dc dim layer alpha
+ */
+typedef struct sde_crtc_mi_dc_backlight
+{
+	uint8_t mi_dc_bl_state;
+	int32_t mi_dc_bl_level;
+	int32_t mi_dc_bl_layer_alpha;
+} sde_crtc_mi_dc_backlight;
+
+typedef struct sde_crtc_mi_layer
+{
+	int32_t layer_index;
+	enum sde_crtc_mi_layer_type last_state;
+} sde_crtc_mi_layer;
+
+/**
+ * sde_crtc_mi_state - mi crtc state
+ * @mi_dim_layer: dim layer added by Mi
+ */
+struct sde_crtc_mi_state {
+	struct sde_hw_dim_layer *mi_dim_layer;
+	struct sde_crtc_mi_layer mi_layer;
+	uint32_t dimlayer_backlight_stash;
+	uint8_t  dimlayer_alpha_stash;
+};
 
 /**
  * struct sde_crtc_state - sde container for atomic crtc state
@@ -397,7 +414,7 @@ struct sde_crtc {
  * @lm_roi        : Current LM ROI, possibly sub-rectangle of mode.
  *                  Origin top left of CRTC.
  * @user_roi_list : List of user's requested ROIs as from set property
-  * @property_state: Local storage for msm_prop properties
+ * @property_state: Local storage for msm_prop properties
  * @property_values: Current crtc property values
  * @input_fence_timeout_ns : Cached input fence timeout, in ns
  * @num_dim_layers: Number of dim layers
@@ -408,7 +425,7 @@ struct sde_crtc {
  * @ds_cfg: Destination scaler config
  * @scl3_lut_cfg: QSEED3 lut config
  * @new_perf: new performance state being requested
- * @secure_session: Indicates the type of secure session
+ * @mi_state: Mi part of crtc state
  */
 struct sde_crtc_state {
 	struct drm_crtc_state base;
@@ -438,7 +455,9 @@ struct sde_crtc_state {
 	struct sde_hw_scaler3_lut_cfg scl3_lut_cfg;
 
 	struct sde_core_perf_params new_perf;
-	int secure_session;
+    /* Mi crtc state */
+	struct sde_crtc_mi_state mi_state;
+	uint32_t num_dim_layers_bank;
 };
 
 enum sde_crtc_irq_state {
@@ -861,6 +880,23 @@ void sde_crtc_get_misr_info(struct drm_crtc *crtc,
 		struct sde_crtc_misr_info *crtc_misr_info);
 
 /**
+ * sde_crtc_mi_atomic_check - to do crtc mi atomic check
+ * @crtc: Pointer to sde crtc state structure
+ * @cstate: Pointer to sde crtc state structure
+ * @pstates: Pointer to sde plane state structure
+ * @cnt: plane refence count
+ */
+int sde_crtc_mi_atomic_check(struct sde_crtc *sde_crtc, struct sde_crtc_state *cstate,
+		void *pstates, int cnt);
+
+/**
+ * sde_crtc_get_mi_fod_sync_info - to do crtc mi sync info
+ * @cstate: Pointer to sde crtc state structure
+ */
+uint32_t sde_crtc_get_mi_fod_sync_info(struct sde_crtc_state *cstate);
+
+
+/**
  * sde_crtc_get_num_datapath - get the number of datapath active
  *				of primary connector
  * @crtc: Pointer to DRM crtc object
@@ -868,12 +904,6 @@ void sde_crtc_get_misr_info(struct drm_crtc *crtc,
  */
 int sde_crtc_get_num_datapath(struct drm_crtc *crtc,
 		struct drm_connector *connector);
-
-/**
- * _sde_crtc_clear_dim_layers_v1 - clear all dim layer settings
- * @cstate:      Pointer to drm crtc state
- */
-void _sde_crtc_clear_dim_layers_v1(struct drm_crtc_state *state);
 
 /*
  * sde_crtc_set_compression_ratio - set compression ratio src_bpp/target_bpp

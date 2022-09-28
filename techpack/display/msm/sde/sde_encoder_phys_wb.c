@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
@@ -1035,8 +1036,7 @@ static void _sde_encoder_phys_wb_frame_done_helper(void *arg, bool frame_error)
 	SDE_DEBUG("[wb:%d,%u]\n", hw_wb->idx - WB_0, wb_enc->frame_count);
 
 	/* don't notify upper layer for internal commit */
-	if (phys_enc->enable_state == SDE_ENC_DISABLING &&
-			!phys_enc->in_clone_mode)
+	if (phys_enc->enable_state == SDE_ENC_DISABLING)
 		goto complete;
 
 	if (phys_enc->parent_ops.handle_frame_done &&
@@ -1216,32 +1216,6 @@ static int sde_encoder_phys_wb_frame_timeout(struct sde_encoder_phys *phys_enc)
 	return event;
 }
 
-static void _sde_encoder_phys_wb_reset_state(
-		struct sde_encoder_phys *phys_enc)
-{
-	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
-
-	/*
-	 * frame count and kickoff count are only used for debug purpose. Frame
-	 * count can be more than kickoff count at the end of disable call due
-	 * to extra frame_done wait. It does not cause any issue because
-	 * frame_done wait is based on retire_fence count. Leaving these
-	 * counters for debugging purpose.
-	 */
-	if (wb_enc->frame_count != wb_enc->kickoff_count) {
-		SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc),
-			wb_enc->kickoff_count, wb_enc->frame_count,
-			phys_enc->in_clone_mode);
-		wb_enc->frame_count = wb_enc->kickoff_count;
-	}
-
-	phys_enc->enable_state = SDE_ENC_DISABLED;
-	wb_enc->crtc = NULL;
-	phys_enc->hw_cdm = NULL;
-	phys_enc->hw_ctl = NULL;
-	phys_enc->in_clone_mode = false;
-}
-
 static int _sde_encoder_phys_wb_wait_for_commit_done(
 		struct sde_encoder_phys *phys_enc, bool is_disable)
 {
@@ -1325,18 +1299,7 @@ skip_wait:
 static int sde_encoder_phys_wb_wait_for_commit_done(
 		struct sde_encoder_phys *phys_enc)
 {
-	int rc;
-
-	if (phys_enc->enable_state == SDE_ENC_DISABLING &&
-			phys_enc->in_clone_mode) {
-		rc = _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, true);
-		_sde_encoder_phys_wb_reset_state(phys_enc);
-		sde_encoder_phys_wb_irq_ctrl(phys_enc, false);
-	} else {
-		rc = _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, false);
-	}
-
-	return rc;
+	return _sde_encoder_phys_wb_wait_for_commit_done(phys_enc, false);
 }
 
 static int sde_encoder_phys_wb_wait_for_cwb_done(
@@ -1620,9 +1583,7 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 	SDE_DEBUG("[wait_for_done: wb:%d, frame:%u, kickoff:%u]\n",
 			hw_wb->idx - WB_0, wb_enc->frame_count,
 			wb_enc->kickoff_count);
-
-	if (!phys_enc->in_clone_mode || !wb_enc->crtc->state->active)
-		_sde_encoder_phys_wb_wait_for_commit_done(phys_enc, true);
+	_sde_encoder_phys_wb_wait_for_commit_done(phys_enc, true);
 
 	if (!phys_enc->hw_ctl || !phys_enc->parent ||
 			!phys_enc->sde_kms || !wb_enc->fb_disable) {
@@ -1630,16 +1591,11 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 		goto exit;
 	}
 
+	/* avoid reset frame for CWB */
 	if (phys_enc->in_clone_mode) {
 		_sde_encoder_phys_wb_setup_cwb(phys_enc, false);
 		_sde_encoder_phys_wb_update_cwb_flush(phys_enc, false);
-		phys_enc->enable_state = SDE_ENC_DISABLING;
-
-		if (wb_enc->crtc->state->active) {
-			sde_encoder_phys_wb_irq_ctrl(phys_enc, true);
-			return;
-		}
-
+		phys_enc->in_clone_mode = false;
 		goto exit;
 	}
 
@@ -1672,7 +1628,24 @@ static void sde_encoder_phys_wb_disable(struct sde_encoder_phys *phys_enc)
 	sde_encoder_phys_wb_irq_ctrl(phys_enc, false);
 
 exit:
-	_sde_encoder_phys_wb_reset_state(phys_enc);
+	/*
+	 * frame count and kickoff count are only used for debug purpose. Frame
+	 * count can be more than kickoff count at the end of disable call due
+	 * to extra frame_done wait. It does not cause any issue because
+	 * frame_done wait is based on retire_fence count. Leaving these
+	 * counters for debugging purpose.
+	 */
+	if (wb_enc->frame_count != wb_enc->kickoff_count) {
+		SDE_EVT32(DRMID(phys_enc->parent), WBID(wb_enc),
+			wb_enc->kickoff_count, wb_enc->frame_count,
+			phys_enc->in_clone_mode);
+		wb_enc->frame_count = wb_enc->kickoff_count;
+	}
+
+	phys_enc->enable_state = SDE_ENC_DISABLED;
+	wb_enc->crtc = NULL;
+	phys_enc->hw_cdm = NULL;
+	phys_enc->hw_ctl = NULL;
 }
 
 /**

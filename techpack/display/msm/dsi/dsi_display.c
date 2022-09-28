@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/list.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/err.h>
+#include <drm/drm_notifier_mi.h>
 
 #include "msm_drv.h"
 #include "sde_connector.h"
@@ -206,6 +208,7 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 
 	mutex_lock(&panel->panel_lock);
 	if (!dsi_panel_initialized(panel)) {
+		pr_err("[%s] --- panel not initialized, bl_lvl = %d\n", __func__, bl_lvl);
 		rc = -EINVAL;
 		goto error;
 	}
@@ -246,7 +249,7 @@ error:
 	return rc;
 }
 
-static int dsi_display_cmd_engine_enable(struct dsi_display *display)
+int dsi_display_cmd_engine_enable(struct dsi_display *display)
 {
 	int rc = 0;
 	int i;
@@ -290,7 +293,7 @@ done:
 	return rc;
 }
 
-static int dsi_display_cmd_engine_disable(struct dsi_display *display)
+int dsi_display_cmd_engine_disable(struct dsi_display *display)
 {
 	int rc = 0;
 	int i;
@@ -476,7 +479,7 @@ error:
 }
 
 /* Allocate memory for cmd dma tx buffer */
-static int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display)
+int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display)
 {
 	int rc = 0, cnt = 0;
 	struct dsi_display_ctrl *display_ctrl;
@@ -864,6 +867,23 @@ release_panel_lock:
 	return rc;
 }
 
+char oled_wp_str[20] = {0};
+
+static int __init
+oled_wp_setup(char* str)
+{
+	strlcpy(oled_wp_str, str, sizeof(oled_wp_str));
+	return 1;
+}
+__setup("androidboot.oled_wp=", oled_wp_setup);
+
+ssize_t wp_info_show(struct device *device,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%s\n", oled_wp_str);
+}
+
 static int dsi_display_cmd_prepare(const char *cmd_buf, u32 cmd_buf_len,
 		struct dsi_cmd_desc *cmd, u8 *payload, u32 payload_len)
 {
@@ -1045,26 +1065,60 @@ int dsi_display_set_power(struct drm_connector *connector,
 		int power_mode, void *disp)
 {
 	struct dsi_display *display = disp;
+	struct dsi_panel_mi_cfg *mi_cfg;
 	int rc = 0;
+	struct mi_drm_notifier notify_data;
+	const char *sde_power_mode_str[] = {
+		[SDE_MODE_DPMS_ON] = "SDE_MODE_DPMS_ON",
+		[SDE_MODE_DPMS_LP1] = "SDE_MODE_DPMS_LP1",
+		[SDE_MODE_DPMS_LP2] = "SDE_MODE_DPMS_LP2",
+		[SDE_MODE_DPMS_STANDBY] = "SDE_MODE_DPMS_STANDBY",
+		[SDE_MODE_DPMS_SUSPEND] = "SDE_MODE_DPMS_SUSPEND",
+		[SDE_MODE_DPMS_OFF] = "SDE_MODE_DPMS_OFF",
+	};
 
 	if (!display || !display->panel) {
 		DSI_ERR("invalid display/panel\n");
 		return -EINVAL;
 	}
 
+	mi_cfg = &display->panel->mi_cfg;
+
+	notify_data.data = &power_mode;
+	notify_data.id = MSM_DRM_PRIMARY_DISPLAY;
+
+	DSI_INFO("power_mode = %s\n", sde_power_mode_str[power_mode]);
+
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
+		mi_cfg->in_aod = true;
+		mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp1(display->panel);
+		if (mi_cfg->unset_doze_brightness)
+			dsi_panel_set_doze_brightness(display->panel,
+				mi_cfg->unset_doze_brightness, true);
+		mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
 		break;
 	case SDE_MODE_DPMS_LP2:
+		mi_cfg->in_aod = true;
+		mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp2(display->panel);
+		if (mi_cfg->unset_doze_brightness)
+			dsi_panel_set_doze_brightness(display->panel,
+				mi_cfg->unset_doze_brightness, true);
+		mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
 		break;
 	case SDE_MODE_DPMS_ON:
+		mi_cfg->in_aod = false;
 		if ((display->panel->power_mode == SDE_MODE_DPMS_LP1) ||
-			(display->panel->power_mode == SDE_MODE_DPMS_LP2))
+			(display->panel->power_mode == SDE_MODE_DPMS_LP2)) {
+			mi_drm_notifier_call_chain(MI_DRM_EARLY_EVENT_BLANK, &notify_data);
 			rc = dsi_panel_set_nolp(display->panel);
+			mi_drm_notifier_call_chain(MI_DRM_EVENT_BLANK, &notify_data);
+		}
 		break;
 	case SDE_MODE_DPMS_OFF:
+		mi_cfg->in_aod = false;
 	default:
 		return rc;
 	}
@@ -5210,6 +5264,8 @@ static int dsi_display_bind(struct device *dev,
 	/* register te irq handler */
 	dsi_display_register_te_irq(display);
 
+	dsi_panel_procfs_init(display->panel);
+
 	goto error;
 
 error_host_deinit:
@@ -5256,6 +5312,8 @@ static void dsi_display_unbind(struct device *dev,
 	}
 
 	mutex_lock(&display->display_lock);
+
+	dsi_panel_procfs_deinit(display->panel);
 
 	rc = dsi_panel_drv_deinit(display->panel);
 	if (rc)
@@ -5416,6 +5474,7 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 	display->panel_node = panel_node;
 	display->pdev = pdev;
 	display->boot_disp = boot_disp;
+	display->is_prim_display = true;
 
 	dsi_display_parse_cmdline_topology(display, index);
 
@@ -6064,10 +6123,7 @@ int dsi_display_get_info(struct drm_connector *connector,
 	info->max_width = 1920;
 	info->max_height = 1080;
 	info->qsync_min_fps =
-		display->panel->qsync_caps.qsync_min_fps;
-	info->has_qsync_min_fps_list =
-		(display->panel->qsync_caps.qsync_min_fps_list_len > 0) ?
-		true : false;
+		display->panel->qsync_min_fps;
 
 	switch (display->panel->panel_mode) {
 	case DSI_OP_VIDEO_MODE:
@@ -6510,25 +6566,6 @@ int dsi_display_get_default_lms(void *dsi_display, u32 *num_lm)
 	mutex_unlock(&display->display_lock);
 
 	return rc;
-}
-
-int dsi_display_get_qsync_min_fps(void *display_dsi, u32 mode_fps)
-{
-	struct dsi_display *display = (struct dsi_display *)display_dsi;
-	struct dsi_panel *panel;
-	u32 i;
-
-	if (display == NULL || display->panel == NULL)
-		return -EINVAL;
-
-	panel = display->panel;
-	for (i = 0; i < panel->dfps_caps.dfps_list_len; i++) {
-		if (panel->dfps_caps.dfps_list[i] == mode_fps)
-			return panel->qsync_caps.qsync_min_fps_list[i];
-	}
-	SDE_EVT32(mode_fps);
-	DSI_DEBUG("Invalid mode_fps %d\n", mode_fps);
-	return -EINVAL;
 }
 
 int dsi_display_find_mode(struct dsi_display *display,
@@ -7168,7 +7205,7 @@ int dsi_display_prepare(struct dsi_display *display)
 	if (mode->dsi_mode_flags & DSI_MODE_FLAG_DMS) {
 		if (display->is_cont_splash_enabled &&
 		    display->config.panel_mode == DSI_OP_VIDEO_MODE) {
-			DSI_ERR("DMS not supported on first frame\n");
+			DSI_ERR("DMS not supported on first frame, ignor\n");
 			rc = -EINVAL;
 			goto error;
 		}
@@ -7362,7 +7399,7 @@ static int dsi_display_qsync(struct dsi_display *display, bool enable)
 	int i;
 	int rc = 0;
 
-	if (!display->panel->qsync_caps.qsync_min_fps) {
+	if (!display->panel->qsync_min_fps) {
 		DSI_ERR("%s:ERROR: qsync set, but no fps\n", __func__);
 		return 0;
 	}
@@ -7390,7 +7427,7 @@ static int dsi_display_qsync(struct dsi_display *display, bool enable)
 	}
 
 exit:
-	SDE_EVT32(enable, display->panel->qsync_caps.qsync_min_fps, rc);
+	SDE_EVT32(enable, display->panel->qsync_min_fps, rc);
 	mutex_unlock(&display->display_lock);
 	return rc;
 }
@@ -7597,6 +7634,7 @@ int dsi_display_enable(struct dsi_display *display)
 		}
 
 		display->panel->panel_initialized = true;
+		display->panel->mi_cfg.panel_initialized = true;
 		DSI_DEBUG("cont splash enabled, display enable not required\n");
 		return 0;
 	}

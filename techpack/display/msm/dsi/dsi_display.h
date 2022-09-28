@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #ifndef _DSI_DISPLAY_H_
@@ -199,6 +200,7 @@ struct dsi_display {
 	const char *display_type;
 	struct list_head list;
 	bool is_cont_splash_enabled;
+	bool is_prim_display;
 	bool sw_te_using_wd;
 	struct mutex display_lock;
 	int disp_te_gpio;
@@ -393,16 +395,6 @@ void dsi_display_put_mode(struct dsi_display *display,
  * Return: error code.
  */
 int dsi_display_get_default_lms(void *dsi_display, u32 *num_lm);
-
-/**
- * dsi_display_get_qsync_min_fps() - get qsync min fps for given fps
- * @display:            Handle to display.
- * @mode_fps:           Fps value of current mode
- *
- * Return: error code.
- */
-int dsi_display_get_qsync_min_fps(void *dsi_display, u32 mode_fps);
-
 
 /**
  * dsi_display_find_mode() - retrieve cached DSI mode given relevant params
@@ -707,6 +699,10 @@ int dsi_display_pre_kickoff(struct drm_connector *connector,
 int dsi_display_pre_commit(void *display,
 		struct msm_display_conn_params *params);
 
+ssize_t wp_info_show(struct device *device,
+	    struct device_attribute *attr,
+		char *buf);
+
 /**
  * dsi_display_get_dst_format() - get dst_format from DSI display
  * @connector:        Pointer to drm connector structure
@@ -735,4 +731,10 @@ int dsi_display_cont_splash_config(void *display);
 int dsi_display_get_panel_vfp(void *display,
 	int h_active, int v_active);
 
+int dsi_display_cmd_engine_enable(struct dsi_display *display);
+int dsi_display_cmd_engine_disable(struct dsi_display *display);
+int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display);
+
+int dsi_display_hbm_set_disp_param(struct drm_connector *connector,
+				u32 param_type);
 #endif /* _DSI_DISPLAY_H_ */

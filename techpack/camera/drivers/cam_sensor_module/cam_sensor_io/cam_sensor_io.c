@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include "cam_sensor_io.h"
 #include "cam_sensor_i2c.h"
 
 int32_t camera_io_dev_poll(struct camera_io_master *io_master_info,
-	uint32_t addr, uint16_t data, uint32_t data_mask,
+	uint32_t addr, uint32_t data, uint32_t data_mask,
 	enum camera_sensor_i2c_type addr_type,
 	enum camera_sensor_i2c_type data_type,
 	uint32_t delay_ms)
