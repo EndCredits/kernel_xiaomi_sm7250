@@ -76,7 +76,7 @@ generate_flashable(){
     unzip -o $ANYKERNEL_FILE;
 
     echo ' Removing old package file ';
-    rm -rf $ANYKERNEL_PATH/Kernel-CST-*;
+    rm -rf $ANYKERNEL_PATH/Kernel-*;
 
     echo ' Copying Kernel File '; 
     cp -r $TARGET_KERNEL_FILE $ANYKERNEL_PATH/;
