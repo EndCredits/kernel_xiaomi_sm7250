@@ -1,5 +1,4 @@
 #include "bengal.dtsi"
-#include "bengal-pmi632.dtsi"
 / {
 };
 

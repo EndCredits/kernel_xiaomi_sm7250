@@ -37,7 +37,6 @@
 					"lpass_audio_hw_vote";
 			clocks = <&lpass_core_hw_vote 0>,
 					<&lpass_audio_hw_vote 0>;
-			qcom,swr-master-version = <0x01050001>;
 			qcom,swr_master_id = <3>;
 			qcom,mipi-sdw-block-packing-mode = <1>;
 			swrm-io-base = <0x3230000 0x0>;
@@ -87,7 +86,6 @@
 					"lpass_audio_hw_vote";
 			clocks = <&lpass_core_hw_vote 0>,
 					<&lpass_audio_hw_vote 0>;
-			qcom,swr-master-version = <0x01050001>;
 			qcom,swr_master_id = <2>;
 			qcom,mipi-sdw-block-packing-mode = <1>;
 			swrm-io-base = <0x3210000 0x0>;
@@ -131,7 +129,6 @@
 					"lpass_audio_hw_vote";
 			clocks = <&lpass_core_hw_vote 0>,
 					<&lpass_audio_hw_vote 0>;
-			qcom,swr-master-version = <0x01050001>;
 			qcom,swr_master_id = <1>;
 			qcom,mipi-sdw-block-packing-mode = <0>;
 			swrm-io-base = <0x3250000 0x0>;
@@ -386,12 +383,6 @@
 	qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrRight";
 	qcom,codec-max-aux-devs = <1>;
 	qcom,codec-aux-devs = <&wcd938x_codec>;
-	qcom,cps_reg_phy_addr = <0x3250300 0x3250304 0x3250318>;
-	qcom,cps_wsa_vbatt_temp_reg_addr = <0x0003429 0x0003422>;
-	qcom,cps_threshold_levels = <148 168>;
-	qcom,cps_normal_values = <0x8E 0x8F 0x8F>;
-	qcom,cps_lower1_values = <0x10 0xD0 0xD0>;
-	qcom,cps_lower2_values = <0x0F 0x0F 0x18>;
 	qcom,msm_audio_ssr_devs = <&audio_apr>, <&q6core>,
 				  <&lpi_tlmm>, <&bolero>;
 };

@@ -90,7 +90,7 @@
 		qcom,gpu-qdss-stm = <0x161c0000 0x40000>; /* base addr, size */
 
 		#cooling-cells = <2>;
-		qcom,tzone-names = "gpuss-0-usr", "gpuss-1-usr";
+		qcom,tzone-name = "gpuss-max-step";
 
 		/* CPU latency parameter */
 		qcom,pm-qos-active-latency = <67>;
@@ -431,12 +431,10 @@
 				<&gcc GCC_DDRSS_GPU_AXI_CLK>,
 				<&gcc GCC_GPU_MEMNOC_GFX_CLK>,
 				<&gpucc GPU_CC_AHB_CLK>,
-				<&gpucc GPU_CC_HLOS1_VOTE_GPU_SMMU_CLK>,
-				<&aopcc QDSS_CLK>;
+				<&gpucc GPU_CC_HLOS1_VOTE_GPU_SMMU_CLK>;
 
 		clock-names = "gmu_clk", "cxo_clk", "axi_clk",
-				"memnoc_clk", "gpu_cc_ahb", "smmu_vote",
-				"apb_pclk";
+				"memnoc_clk", "gpu_cc_ahb", "smmu_vote";
 
 		/* AOP mailbox for sending ACD enable and disable messages */
 		mboxes = <&qmp_aop 0>;
