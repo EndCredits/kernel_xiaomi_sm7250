@@ -33,7 +33,15 @@ USERINCLUDE     += \
 # Needed to be compatible with the O= option
 LINUXINCLUDE    += \
                 -I$(srctree)/techpack/audio/include/uapi \
+                -I$(srctree)/techpack/audio/include/elliptic \
                 -I$(srctree)/techpack/audio/include
+
+#for mius start
+ifeq ($(CONFIG_US_PROXIMITY), y)
+LINUXINCLUDE    += \
+                -I$(srctree)/techpack/audio/include/mius
+endif
+#for mius end
 
 ifeq ($(CONFIG_ARCH_SDXPOORWILLS), y)
 LINUXINCLUDE    += \
@@ -47,13 +55,13 @@ ifeq ($(CONFIG_ARCH_SDMSHRIKE), y)
 LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/sm8150autoconf.h
 endif
-ifeq ($(CONFIG_ARCH_KONA), y)
-LINUXINCLUDE    += \
-                -include $(srctree)/techpack/audio/config/konaautoconf.h
-endif
 ifeq ($(CONFIG_ARCH_LITO), y)
 LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/litoautoconf.h
+endif
+ifeq ($(CONFIG_ARCH_KONA), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/konaautoconf.h
 endif
 ifeq ($(CONFIG_ARCH_SDM660), y)
 LINUXINCLUDE    += \
@@ -61,5 +69,10 @@ LINUXINCLUDE    += \
 endif
 obj-y += soc/
 obj-y += dsp/
+#for mius start
+ifeq ($(CONFIG_US_PROXIMITY), y)
+obj-y += dsp/mius
+endif
+#for mius end
 obj-y += ipc/
 obj-y += asoc/
