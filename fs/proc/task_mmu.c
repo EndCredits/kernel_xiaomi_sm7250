@@ -1736,7 +1736,7 @@ int reclaim_address_space(struct address_space *mapping,
 	return ret;
 }
 
-static int reclaim_pte_range(pmd_t *pmd, unsigned long addr,
+int reclaim_pte_range(pmd_t *pmd, unsigned long addr,
 				unsigned long end, struct mm_walk *walk)
 {
 	struct reclaim_param *rp = walk->private;
