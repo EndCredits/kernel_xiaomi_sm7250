@@ -510,6 +510,18 @@
 			label = "dfps_data_region";
 		};
 
+		disp_rdump_memory: disp_rdump_region@0xa0000000 {
+			reg = <0x0 0xA0000000 0x0 0x02300000>;
+			label = "disp_rdump_region";
+		};
+
+		dump_mem: mem_dump_region {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
+			reusable;
+			size = <0 0x2800000>;
+		};
+
 		/* global autoconfigured region for contiguous allocations */
 		linux,cma {
 			compatible = "shared-dma-pool";
@@ -523,7 +535,7 @@
 	};
 
 	chosen {
-		bootargs = "quite nodebugmon rcu_nocbs=0-7 earlycon=msm_geni_serial,0x888000 kpti=off" noirqdebug printk.devkmsg=on rcupdate.rcu_normal_after_boot=1;
+		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7 earlycon=msm_geni_serial,0x888000 kpti=off";
 	};
 
 	soc: soc { };
@@ -1401,6 +1413,7 @@
 		qcom,bark-time = <20000>;
 		qcom,pet-time = <15000>;
 		qcom,ipi-ping;
+		qcom,wakeup-enable;
 	};
 
 	jtag_mm0: jtagmm@7040000 {
@@ -1412,7 +1425,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU0>;
-		status = "disabled";
 	};
 
 	jtag_mm1: jtagmm@7140000 {
@@ -1424,7 +1436,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU1>;
-		status = "disabled";
 	};
 
 	jtag_mm2: jtagmm@7240000 {
@@ -1436,7 +1447,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU2>;
-		status = "disabled";
 	};
 
 	jtag_mm3: jtagmm@7340000 {
@@ -1448,7 +1458,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU3>;
-		status = "disabled";
 	};
 
 	jtag_mm4: jtagmm@7440000 {
@@ -1460,7 +1469,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU4>;
-		status = "disabled";
 	};
 
 	jtag_mm5: jtagmm@7540000 {
@@ -1472,7 +1480,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU5>;
-		status = "disabled";
 	};
 
 	jtag_mm6: jtagmm@7640000 {
@@ -1484,7 +1491,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU6>;
-		status = "disabled";
 	};
 
 	jtag_mm7: jtagmm@7740000 {
@@ -1496,7 +1502,6 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU7>;
-		status = "disabled";
 	};
 
 	keepalive_opp_table: keepalive-opp-table {
@@ -1603,8 +1608,6 @@
 		reg-names = "cc_base";
 		vdd_cx-supply = <&VDD_CX_LEVEL>;
 		vdd_cx_ao-supply = <&VDD_CX_LEVEL_AO>;
-		gdsc_cx-supply = <&gpu_cx_gdsc>;
-		clocks = <&rpmhcc RPMH_CXO_CLK>;
 		#clock-cells = <1>;
 		#reset-cells = <1>;
 	};
@@ -1651,7 +1654,6 @@
 		reg-names = "cc_base";
 		vdd_cx-supply = <&VDD_CX_LEVEL>;
 		vdd_mx-supply = <&VDD_MX_LEVEL>;
-		gdsc_cx-supply = <&gpu_cx_gdsc>;
 		clocks = <&rpmhcc RPMH_CXO_CLK>;
 		clock-names = "xo";
 		#clock-cells = <1>;
@@ -1665,7 +1667,6 @@
 			<0x9810000 0x10000>;
 		reg-names = "cc", "qdsp6ss", "qdsp6ss_pll";
 		vdd_cx-supply = <&VDD_CX_LEVEL>;
-		npu_core-supply = <&npu_core_gdsc>;
 		nvmem-cells = <&npu_efuse>;
 		nvmem-cell-names = "npu-bin";
 		#clock-cells = <1>;
@@ -2112,7 +2113,7 @@
 
 	rmtfs_sharedmem: qcom,rmtfs_sharedmem@0 {
 		compatible = "qcom,sharedmem-uio";
-		reg = <0x0 0x280000>;
+		reg = <0x0 0x200000>;
 		reg-names = "rmtfs";
 		qcom,client-id = <0x00000001>;
 		qcom,guard-memory;
@@ -2154,7 +2155,7 @@
 
 	mem_dump {
 		compatible = "qcom,mem-dump";
-		status = "disabled";
+		memory-region = <&dump_mem>;
 
 		c0_context {
 			qcom,dump-size = <0x800>;
@@ -3330,7 +3331,7 @@
 
 	cpu0_cpu_llcc_lat: qcom,cpu0-cpu-llcc-lat {
 		compatible = "qcom,devbw";
-		governor = "powersave";
+		governor = "performance";
 		qcom,src-dst-ports =
 			<MSM_BUS_MASTER_AMPSS_M0 MSM_BUS_SLAVE_LLCC>;
 		qcom,active-only;
@@ -3339,7 +3340,7 @@
 
 	cpu0_llcc_ddr_lat: qcom,cpu0-llcc-ddr-lat {
 		compatible = "qcom,devbw";
-		governor = "powersave";
+		governor = "performance";
 		qcom,src-dst-ports =
 			<MSM_BUS_MASTER_LLCC MSM_BUS_SLAVE_EBI_CH0>;
 		qcom,active-only;
@@ -3348,7 +3349,7 @@
 
 	cpu0_cpu_ddr_latfloor: qcom,cpu0-cpu-ddr-latfloor {
 		compatible = "qcom,devbw";
-		governor = "powersave";
+		governor = "performance";
 		qcom,src-dst-ports =
 			<MSM_BUS_MASTER_LLCC MSM_BUS_SLAVE_EBI_CH0>;
 		qcom,active-only;
@@ -3410,7 +3411,7 @@
 
 	cpu6_cpu_llcc_lat: qcom,cpu6-cpu-llcc-lat {
 		compatible = "qcom,devbw";
-		governor = "powersave";
+		governor = "performance";
 		qcom,src-dst-ports =
 			<MSM_BUS_MASTER_AMPSS_M0 MSM_BUS_SLAVE_LLCC>;
 		qcom,active-only;
@@ -3419,7 +3420,7 @@
 
 	cpu6_llcc_ddr_lat: qcom,cpu6-llcc-ddr-lat {
 		compatible = "qcom,devbw";
-		governor = "powersave";
+		governor = "performance";
 		qcom,src-dst-ports =
 			<MSM_BUS_MASTER_LLCC MSM_BUS_SLAVE_EBI_CH0>;
 		qcom,active-only;
@@ -3428,7 +3429,7 @@
 
 	cpu6_cpu_ddr_latfloor: qcom,cpu6-cpu-ddr-latfloor {
 		compatible = "qcom,devbw";
-		governor = "powersave";
+		governor = "performance";
 		qcom,src-dst-ports =
 			<MSM_BUS_MASTER_LLCC MSM_BUS_SLAVE_EBI_CH0>;
 		qcom,active-only;
@@ -3437,7 +3438,7 @@
 
 	cpu7_cpu_ddr_latfloor: qcom,cpu7-cpu-ddr-latfloor {
 		compatible = "qcom,devbw";
-		governor = "powersave";
+		governor = "performance";
 		qcom,src-dst-ports =
 			<MSM_BUS_MASTER_LLCC MSM_BUS_SLAVE_EBI_CH0>;
 		qcom,active-only;
@@ -3876,6 +3877,7 @@
 };
 
 #include "lito-qupv3.dtsi"
+#include "lito-coresight.dtsi"
 #include "camera/lito-camera.dtsi"
 #include "lito-audio.dtsi"
 

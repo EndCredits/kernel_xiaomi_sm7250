@@ -109,8 +109,6 @@
 		qcom,no-status-check-on-disable;
 		qcom,clk-dis-wait-val = <8>;
 		qcom,gds-timeout = <500>;
-		proxy-supply = <&gpu_cx_gdsc>;
-		qcom,proxy-consumer-enable;
 		status = "disabled";
 	};
 
@@ -140,8 +138,6 @@
 		compatible = "qcom,gdsc";
 		reg = <0x9981004 0x4>;
 		regulator-name = "npu_core_gdsc";
-		proxy-supply = <&npu_core_gdsc>;
-		qcom,proxy-consumer-enable;
 		status = "disabled";
 	};
 
