@@ -1,11 +1,10 @@
 comment "Qualcomm Atheros CLD WLAN module"
 
 config QCA_CLD_WLAN
-
 	tristate "Qualcomm Atheros CLD WLAN module"
 	default n
 	help
-	Add support for the Qualcomm Atheros CLD WLAN module
+	  Add support for the Qualcomm Atheros CLD WLAN module
 
 if QCA_CLD_WLAN != n
 
@@ -15,6 +14,7 @@ config QCA_CLD_WLAN_PROFILE
 	help
 	  Specify which configuration profile to be used for building
 	  this module.
+
 	  Profiles are located at drivers/staging/qcacld-3.0/configs.
 
 endif # QCA_CLD_WLAN
