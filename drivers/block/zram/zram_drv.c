@@ -901,14 +901,13 @@ static ssize_t read_block_state(struct file *file, char __user *buf,
 
 		ts = ktime_to_timespec64(zram->table[index].ac_time);
 		copied = snprintf(kbuf + written, count,
-			"%12zd %12lld.%06lu %c%c%c%c%c\n",
+			"%12zd %12lld.%06lu %c%c%c%c\n",
 			index, (s64)ts.tv_sec,
 			ts.tv_nsec / NSEC_PER_USEC,
 			zram_test_flag(zram, index, ZRAM_SAME) ? 's' : '.',
 			zram_test_flag(zram, index, ZRAM_WB) ? 'w' : '.',
 			zram_test_flag(zram, index, ZRAM_HUGE) ? 'h' : '.',
-			zram_test_flag(zram, index, ZRAM_IDLE) ? 'i' : '.',
-			zram_test_flag(zram, index, ZRAM_DEDUPED) ? 'd' : '.');
+			zram_test_flag(zram, index, ZRAM_IDLE) ? 'i' : '.');
 
 		if (count < copied) {
 			zram_slot_unlock(zram, index);
@@ -1282,9 +1281,6 @@ static void zram_free_page(struct zram *zram, size_t index)
 	if (zram_test_flag(zram, index, ZRAM_IDLE))
 		zram_clear_flag(zram, index, ZRAM_IDLE);
 
-	if (zram_test_flag(zram, index, ZRAM_DEDUPED))
-		zram_clear_flag(zram, index, ZRAM_DEDUPED);
-
 	if (zram_test_flag(zram, index, ZRAM_HUGE)) {
 		zram_clear_flag(zram, index, ZRAM_HUGE);
 		atomic64_dec(&zram->stats.huge_pages);
@@ -1445,7 +1441,6 @@ static int __zram_bvec_write(struct zram *zram, struct bio_vec *bvec,
 
 	entry = zram_dedup_find(zram, page, &checksum);
 	if (entry) {
-		flags = ZRAM_DEDUPED;
 		comp_len = entry->len;
 		goto out;
 	}
@@ -1533,15 +1528,10 @@ out:
 		atomic64_inc(&zram->stats.huge_pages_since);
 	}
 
-	switch (flags) {
-	case ZRAM_SAME:
+	if (flags) {
 		zram_set_flag(zram, index, flags);
 		zram_set_element(zram, index, element);
-		break;
-	case ZRAM_DEDUPED:
-		zram_set_flag(zram, index, flags);
-		// Fallthrough
-	default:
+	}  else {
 		zram_set_entry(zram, index, entry);
 		zram_set_obj_size(zram, index, comp_len);
 	}
