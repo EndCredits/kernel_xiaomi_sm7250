@@ -2010,7 +2010,8 @@ static int zram_add(void)
 		blk_queue_max_write_zeroes_sectors(zram->disk->queue, UINT_MAX);
 
 	zram->disk->queue->backing_dev_info->capabilities |= BDI_CAP_STABLE_WRITES;
-	device_add_disk(NULL, zram->disk);
+	disk_to_dev(zram->disk)->groups = zram_disk_attr_groups;
+	add_disk(zram->disk);
 
 	strlcpy(zram->compressor, default_compressor, sizeof(zram->compressor));
 
