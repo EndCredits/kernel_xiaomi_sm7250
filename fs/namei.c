@@ -434,6 +434,9 @@ int inode_permission2(struct vfsmount *mnt, struct inode *inode, int mask)
 {
 	int retval;
 
+	if (!inode)
+		return 0;
+
 	retval = sb_permission(inode->i_sb, inode, mask);
 	if (retval)
 		return retval;
