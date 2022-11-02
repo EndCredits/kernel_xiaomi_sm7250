@@ -61,6 +61,7 @@ static unsigned int table_size, table_cnt;
 static int all_symbols;
 static int absolute_percpu;
 static int base_relative;
+static int lto_clang;
 
 static int token_profit[0x10000];
 
@@ -72,7 +73,7 @@ static unsigned char best_table_len[256];
 static void usage(void)
 {
 	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--absolute-percpu] "
-			"[--base-relative] < in.map > out.S\n");
+			"[--base-relative] [--lto-clang] < in.map > out.S\n");
 	exit(1);
 }
 
@@ -364,6 +365,34 @@ static int symbol_absolute(const struct sym_entry *s)
 	return s->percpu_absolute;
 }
 
+static char * s_name(char *buf)
+{
+	/* Skip the symbol type */
+	return buf + 1;
+}
+
+static void cleanup_symbol_name(char *s)
+{
+	char *p;
+
+	if (!lto_clang)
+		return;
+
+	/*
+	 * ASCII[.]   = 2e
+	 * ASCII[0-9] = 30,39
+	 * ASCII[A-Z] = 41,5a
+	 * ASCII[_]   = 5f
+	 * ASCII[a-z] = 61,7a
+	 *
+	 * As above, replacing '.' with '\0' does not affect the main sorting,
+	 * but it helps us with subsorting.
+	 */
+	p = strchr(s, '.');
+	if (p)
+		*p = '\0';
+}
+
 static int compare_names(const void *a, const void *b)
 {
 	int ret;
@@ -374,7 +403,9 @@ static int compare_names(const void *a, const void *b)
 
 	expand_symbol(sa->sym, sa->len, sa_namebuf);
 	expand_symbol(sb->sym, sb->len, sb_namebuf);
-	ret = strcmp(&sa_namebuf[1], &sb_namebuf[1]);
+	cleanup_symbol_name(s_name(sa_namebuf));
+	cleanup_symbol_name(s_name(sb_namebuf));
+	ret = strcmp(s_name(sa_namebuf), s_name(sb_namebuf));
 	if (!ret) {
 		if (sa->addr > sb->addr)
 			return 1;
@@ -789,6 +820,8 @@ int main(int argc, char **argv)
 				absolute_percpu = 1;
 			else if (strcmp(argv[i], "--base-relative") == 0)
 				base_relative = 1;
+			else if (strcmp(argv[i], "--lto-clang") == 0)
+				lto_clang = 1;
 			else
 				usage();
 		}
