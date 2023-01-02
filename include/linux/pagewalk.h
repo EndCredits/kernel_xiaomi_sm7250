@@ -26,6 +26,8 @@ struct mm_walk;
  *			right now" and returning 1 means "skip the current vma"
  */
 struct mm_walk_ops {
+	int (*p4d_entry)(p4d_t *p4d, unsigned long addr,
+			 unsigned long next, struct mm_walk *walk);
 	int (*pud_entry)(pud_t *pud, unsigned long addr,
 			 unsigned long next, struct mm_walk *walk);
 	int (*pmd_entry)(pmd_t *pmd, unsigned long addr,
