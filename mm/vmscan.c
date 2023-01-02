@@ -27,6 +27,7 @@
 #include <linux/vmstat.h>
 #include <linux/file.h>
 #include <linux/writeback.h>
+#include <linux/pagewalk.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>	/* for try_to_release_page(),
 					buffer_heads_over_limit */
@@ -1383,7 +1384,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			goto keep_locked;
 
 		/* page_update_gen() tried to promote this page? */
-		if (lru_gen_enabled() && !skip_reference_check &&
+		if (lru_gen_enabled() && !force_reclaim &&
 		    page_mapped(page) && PageReferenced(page))
 			goto keep_locked;
 
@@ -3847,9 +3848,7 @@ static void walk_mm(struct lruvec *lruvec, struct mm_struct *mm, struct lru_gen_
 	int err;
 	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
-	struct mm_walk args = {
-		.mm = mm,
-		.private = walk,
+	struct mm_walk_ops args = {
 		.test_walk = should_skip_vma,
 		.p4d_entry = walk_pud_range,
 	};
@@ -3868,7 +3867,7 @@ static void walk_mm(struct lruvec *lruvec, struct mm_struct *mm, struct lru_gen_
 			unsigned long start = walk->next_addr;
 			unsigned long end = mm->highest_vm_end;
 
-			err = walk_page_range(start, end, &args);
+			err = walk_page_range(mm, start, end, &args, walk);
 
 			up_read(&mm->mmap_sem);
 

@@ -3575,19 +3575,15 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 */
 	arch_start_context_switch(prev);
 
-	/*
-	 * If mm is non-NULL, we pass through switch_mm(). If mm is
-	 * NULL, we will pass through mmdrop() in finish_task_switch().
-	 * Both of these contain the full memory barrier required by
-	 * membarrier after storing to rq->curr, before returning to
-	 * user-space.
-	 */
-	if (!mm) {
-		next->active_mm = oldmm;
-		mmgrab(oldmm);
-		enter_lazy_tlb(oldmm, next);
-	} else
-		switch_mm_irqs_off(oldmm, mm, next);
+/*
+    * kernel -> kernel   lazy + transfer active
+    *   user -> kernel   lazy + mmgrab() active
+    *
+    * kernel ->   user   switch + mmdrop() active
+    *   user ->   user   switch
+    */
+   if (!next->mm) {                                // to kernel
+           enter_lazy_tlb(prev->active_mm, next);
 
 		next->active_mm = prev->active_mm;
 		if (prev->mm)                           // from user
