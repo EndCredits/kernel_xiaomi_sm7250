@@ -2,7 +2,7 @@
 #
 #  build.sh - Automic kernel building script for Rosemary Kernel
 #
-#  Copyright (C) 2021-2022, Crepuscular's AOSP WorkGroup
+#  Copyright (C) 2021-2023, Crepuscular's AOSP WorkGroup
 #  Author: EndCredits <alicization.han@gmail.com>
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -12,7 +12,7 @@
 #  Add clang to your PATH before using this script.
 #
 
-LOCAL_VERSION_NUMBER=Driftwood-v1
+LOCAL_VERSION_NUMBER=v1.0.0
 
 ARCH=arm64;
 CC=clang;
@@ -26,7 +26,7 @@ OUT="../out";
 TARGET_KERNEL_FILE=arch/arm64/boot/Image;
 TARGET_KERNEL_DTB=arch/arm64/boot/dtb;
 TARGET_KERNEL_DTBO=arch/arm64/boot/dtbo.img
-TARGET_KERNEL_NAME=Kernel;
+TARGET_KERNEL_NAME=Hana-Kernel;
 TARGET_KERNEL_MOD_VERSION=$(make kernelversion)-$LOCAL_VERSION_NUMBER;
 
 DEFCONFIG_PATH=arch/arm64/configs
@@ -76,7 +76,7 @@ generate_flashable(){
     unzip -o $ANYKERNEL_FILE;
 
     echo ' Removing old package file ';
-    rm -rf $ANYKERNEL_PATH/Kernel-CST-*;
+    rm -rf $ANYKERNEL_PATH/$TARGET_KERNEL_NAME*;
 
     echo ' Copying Kernel File '; 
     cp -r $TARGET_KERNEL_FILE $ANYKERNEL_PATH/;
