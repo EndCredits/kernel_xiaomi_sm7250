@@ -33,7 +33,7 @@ DEFCONFIG_PATH=arch/arm64/configs
 DEFCONFIG_NAME=vendor/picasso_user_defconfig;
 
 START_SEC=$(date +%s);
-CURRENT_TIME=$(date '+%Z-%Y-%m-%d-%H%M');
+CURRENT_TIME=$(date '+%Y-%m%d%H%M');
 
 ANYKERNEL_URL=https://codeload.github.com/EndCredits/AnyKernel3/zip/refs/heads/picasso;
 ANYKERNEL_PATH=AnyKernel3-picasso;
