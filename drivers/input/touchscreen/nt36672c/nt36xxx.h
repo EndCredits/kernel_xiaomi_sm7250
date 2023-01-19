@@ -51,7 +51,9 @@
 #define PINCTRL_STATE_RELEASE		"pmx_ts_release"
 #define MI_DRM_NOTIFIER
 
-#define NVT_DEBUG 0
+#define NVT_DEBUG 1
+#define TOUCH_DISABLE_LPM 1
+#define TOUCH_IRQ_BOOST 2
 
 //---GPIO number---
 #define NVTTOUCH_RST_PIN 980
