@@ -951,6 +951,7 @@
 
 &pm8150_l13 {
 	qcom,init-voltage = <2800000>;
+	regulator-always-on;
 };
 
 &usb_qmp_dp_phy {
