@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/module.h>
@@ -1428,8 +1429,18 @@ static void dp_display_attention_work(struct work_struct *work)
 			goto end;
 
 		if (dp->link->sink_request & (DP_TEST_LINK_PHY_TEST_PATTERN |
-			DP_TEST_LINK_TRAINING))
+			DP_TEST_LINK_TRAINING)) {
 			goto mst_attention;
+		} else {
+			/*
+			 * It is possible that the connect_work skipped sending
+			 * the HPD notification if the attention message was
+			 * already pending. Send the notification here to
+			 * account for that. This is not needed if this
+			 * attention work was handling a test request
+			 */
+			dp_display_send_hpd_notification(dp);
+		}
 	}
 
 cp_irq:
