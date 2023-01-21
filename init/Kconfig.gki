@@ -1,3 +1,5 @@
+menu "Enable GKI hidden support for kernel"
+
 config GKI_HIDDEN_DRM_CONFIGS
 	bool "Hidden DRM configs needed for GKI"
 	select DRM_KMS_HELPER if (HAS_IOMEM && DRM)
@@ -165,3 +167,5 @@ config GKI_HACKS_TO_FIX
 
 	  Unless you are building a GKI kernel to be used with modules
 	  built from a different config, say N here.
+
+endmenu
