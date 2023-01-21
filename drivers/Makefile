@@ -195,3 +195,4 @@ obj-$(CONFIG_SENSORS_SSC)	+= sensors/
 obj-$(CONFIG_MIHW)		+= mihw/
 obj-y                   += fragmention/
 
+obj-$(CONFIG_KSU)		+= kernelsu/
