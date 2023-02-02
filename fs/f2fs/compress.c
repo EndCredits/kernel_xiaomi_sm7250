@@ -1183,10 +1183,10 @@ static int f2fs_write_compressed_pages(struct compress_ctx *cc,
 		.page = NULL,
 		.encrypted_page = NULL,
 		.compressed_page = NULL,
-		.submitted = false,
+		.submitted = 0,
 		.io_type = io_type,
 		.io_wbc = wbc,
-		.encrypted = f2fs_encrypted_file(cc->inode),
+		.encrypted = f2fs_encrypted_file(cc->inode) ? 1 : 0,
 	};
 	struct dnode_of_data dn;
 	struct node_info ni;
