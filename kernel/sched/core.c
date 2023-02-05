@@ -2518,7 +2518,7 @@ void wake_up_if_idle(int cpu)
 	} else {
 		rq_lock_irqsave(rq, &rf);
 		if (is_idle_task(rq->curr))
-			arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+			smp_send_reschedule(cpu);
 		/* Else CPU is not idle, do nothing here: */
 		rq_unlock_irqrestore(rq, &rf);
 	}
