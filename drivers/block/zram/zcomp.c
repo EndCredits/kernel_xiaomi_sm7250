@@ -11,6 +11,7 @@
 #include <linux/sched.h>
 #include <linux/cpu.h>
 #include <linux/crypto.h>
+#include <linux/devfreq_boost.h>
 
 #include "zcomp.h"
 
@@ -119,6 +120,8 @@ void zcomp_stream_put(struct zcomp *comp)
 	put_cpu_ptr(comp->stream);
 }
 
+extern int kp_active_mode(void);
+
 int zcomp_compress(struct zcomp_strm *zstrm,
 		const void *src, unsigned int *dst_len)
 {
@@ -137,7 +140,13 @@ int zcomp_compress(struct zcomp_strm *zstrm,
 	 * compressed buffer is too big.
 	 */
 	*dst_len = PAGE_SIZE * 2;
-
+	if (kp_active_mode() == 3 || kp_active_mode() == 0) {
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPU_LLCCBW, 100);
+		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW_DDR, 100);
+	} else if (kp_active_mode() == 2) {
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPU_LLCCBW, 58);
+		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW_DDR, 58);
+	}
 	return crypto_comp_compress(zstrm->tfm,
 			src, PAGE_SIZE,
 			zstrm->buffer, dst_len);
@@ -148,6 +157,13 @@ int zcomp_decompress(struct zcomp_strm *zstrm,
 {
 	unsigned int dst_len = PAGE_SIZE;
 
+	if (kp_active_mode() == 3 || kp_active_mode() == 0) {
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPU_LLCCBW, 100);
+		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW_DDR, 100);
+	} else if (kp_active_mode() == 2) {
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPU_LLCCBW, 58);
+		devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW_DDR, 58);
+	}
 	return crypto_comp_decompress(zstrm->tfm,
 			src, src_len,
 			dst, &dst_len);
