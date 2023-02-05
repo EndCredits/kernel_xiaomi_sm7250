@@ -1,20 +1,7 @@
-#include <linux/cpu.h>
-#include <linux/memory.h>
-#include <linux/uaccess.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/kprobes.h>
-#include <linux/printk.h>
-#include <linux/string.h>
-#include <linux/kernel.h>
-#include <linux/slab.h>
-
-#include <ss/sidtab.h>
-#include <ss/services.h>
-#include <objsec.h>
-
 #include "selinux.h"
-#include "../klog.h"
+#include "objsec.h"
+#include "linux/version.h"
+#include "../klog.h" // IWYU pragma: keep
 
 #define KERNEL_SU_DOMAIN "u:r:su:s0"
 
@@ -57,34 +44,58 @@ void setup_selinux()
 	}
 
 	/* we didn't need this now, we have change selinux rules when boot!
-    if (!is_domain_permissive) {
-        if (set_domain_permissive() == 0) {
-            is_domain_permissive = true;
-        }
-    }*/
+if (!is_domain_permissive) {
+  if (set_domain_permissive() == 0) {
+      is_domain_permissive = true;
+  }
+}*/
 }
 
 void setenforce(bool enforce)
 {
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	selinux_state.enforcing = enforce;
+#else
+	selinux_enabled = enforce;
+#endif
 #endif
 }
 
 bool getenforce()
 {
 #ifdef CONFIG_SECURITY_SELINUX_DISABLE
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	if (selinux_state.disabled) {
+#else
+	if (selinux_disabled) {
+#endif
 		return false;
 	}
 #endif
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	return selinux_state.enforcing;
 #else
-	return false;
+	return selinux_enabled;
+#endif
+#else
+	return true;
 #endif
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+/*
+ * get the subjective security ID of the current task
+ */
+static inline u32 current_sid(void)
+{
+	const struct task_security_struct *tsec = current_security();
+
+	return tsec->sid;
+}
+#endif
 
 bool is_ksu_domain()
 {
