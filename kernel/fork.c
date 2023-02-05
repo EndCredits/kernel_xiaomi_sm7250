@@ -2411,9 +2411,11 @@ long _do_fork(unsigned long clone_flags,
 	   * and boost CPU & DDR for 25ms if balanced profile is enabled
 	   */
 	  if (kp_active_mode() == 3 || kp_active_mode() == 0) {
-	    devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
+	    devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW_DDR, 150);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPU_LLCCBW, 150);
 	  } else if (kp_active_mode() == 2) {
-	    devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
+	    devfreq_boost_kick_max(DEVFREQ_MSM_LLCCBW_DDR, 75);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPU_LLCCBW, 75);
 	  }
 	}
 
