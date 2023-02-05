@@ -12,7 +12,7 @@
 #  Add clang to your PATH before using this script.
 #
 
-LOCAL_VERSION_NUMBER=v2.0.0
+LOCAL_VERSION_NUMBER=v2.1.0
 
 ARCH=arm64;
 CC=clang;
