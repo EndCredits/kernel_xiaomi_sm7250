@@ -3748,7 +3748,6 @@ int dsi_panel_validate_mode(struct dsi_panel *panel,
 
 int dsi_panel_get_mode_count(struct dsi_panel *panel)
 {
-	const u32 SINGLE_MODE_SUPPORT = 1;
 	struct dsi_parser_utils *utils;
 	struct device_node *timings_np, *child_np;
 	int num_dfps_rates, num_bit_clks;
@@ -3779,14 +3778,6 @@ int dsi_panel_get_mode_count(struct dsi_panel *panel)
 		rc = -EINVAL;
 		goto error;
 	}
-
-	/* No multiresolution support is available for video mode panels.
-	 * Multi-mode is supported for video mode during POMS is enabled.
-	 */
-	if (panel->panel_mode != DSI_OP_CMD_MODE &&
-		!panel->host_config.ext_bridge_mode &&
-		!panel->panel_mode_switch_enabled)
-		count = SINGLE_MODE_SUPPORT;
 
 	panel->num_timing_nodes = count;
 	dsi_for_each_child_node(timings_np, child_np) {
