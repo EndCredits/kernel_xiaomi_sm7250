@@ -380,8 +380,6 @@ static int erofs_read_superblock(struct super_block *sb)
 	/* handle multiple devices */
 	ret = erofs_init_devices(sb, dsb);
 
-	if (erofs_sb_has_ztailpacking(sbi))
-		erofs_info(sb, "EXPERIMENTAL compressed inline data feature in use. Use at your own risk!");
 	if (erofs_sb_has_fragments(sbi))
 		erofs_info(sb, "EXPERIMENTAL compressed fragments feature in use. Use at your own risk!");
 	if (erofs_sb_has_dedupe(sbi))
