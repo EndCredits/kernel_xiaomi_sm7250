@@ -67,6 +67,7 @@ struct erofs_dev_context {
 	struct rw_semaphore rwsem;
 
 	unsigned int extra_devices;
+	bool flatdev;
 };
 
 /* all filesystem-wide lz4 configurations */

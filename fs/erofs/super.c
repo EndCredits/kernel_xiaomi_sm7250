@@ -252,6 +252,9 @@ static int erofs_init_devices(struct super_block *sb,
 	if (!ondisk_extradevs)
 		return 0;
 
+	if (!sbi->devs->extra_devices)
+		sbi->devs->flatdev = true;
+
 	sbi->device_id_mask = roundup_pow_of_two(ondisk_extradevs + 1) - 1;
 	pos = le16_to_cpu(dsb->devt_slotoff) * EROFS_DEVT_SLOT_SIZE;
 	down_read(&sbi->devs->rwsem);
@@ -265,14 +268,14 @@ static int erofs_init_devices(struct super_block *sb,
 		}
 		dis = ptr + erofs_blkoff(sb, pos);
 
-		bdev = blkdev_get_by_path(dif->path,
-					  FMODE_READ | FMODE_EXCL,
-					  sb->s_type);
-		if (IS_ERR(bdev)) {
-			err = PTR_ERR(bdev);
-			break;
+		if (!sbi->devs->flatdev) {
+			bdev = blkdev_get_by_path(dif->path, FMODE_READ | FMODE_EXCL, sb->s_type);
+			if (IS_ERR(bdev)) {
+				err = PTR_ERR(bdev);
+				break;
+			}
+			dif->bdev = bdev;
 		}
-		dif->bdev = bdev;
 		dif->blocks = le32_to_cpu(dis->blocks);
 		dif->mapped_blkaddr = le32_to_cpu(dis->mapped_blkaddr);
 		sbi->total_blocks += dif->blocks;
