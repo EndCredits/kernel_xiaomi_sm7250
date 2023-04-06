@@ -20,7 +20,7 @@ CLANG_TRIPLE=aarch64-linux-gnu-;
 CROSS_COMPILE=aarch64-linux-gnu-;
 CROSS_COMPILE_COMPAT=arm-linux-gnueabi-;
 THREAD=$(nproc --all);
-CC_ADDITION_FLAGS="OBJDUMP=llvm-objdump LLVM_IAS=1 LLVM=1";
+CC_ADDITION_FLAGS="";
 OUT="../out";
 
 TARGET_KERNEL_FILE=arch/arm64/boot/Image;
