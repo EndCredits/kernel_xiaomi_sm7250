@@ -33,18 +33,17 @@ void erofs_put_metabuf(struct erofs_buf *buf)
  * Derive the block size from inode->i_blkbits to make compatible with
  * anonymous inode in fscache mode.
  */
-void *erofs_bread(struct erofs_buf *buf, struct inode *inode,
-		  erofs_blk_t blkaddr, enum erofs_kmap_type type)
+void *erofs_bread(struct erofs_buf *buf, erofs_blk_t blkaddr,
+		  enum erofs_kmap_type type)
 {
+	struct inode *inode = buf->inode;
 	erofs_off_t offset = (erofs_off_t)blkaddr << inode->i_blkbits;
-	struct address_space *const mapping = inode->i_mapping;
 	pgoff_t index = offset >> PAGE_SHIFT;
 	struct page *page = buf->page;
 
 	if (!page || page->index != index) {
 		erofs_put_metabuf(buf);
-		page = read_cache_page_gfp(mapping, index,
-				mapping_gfp_constraint(mapping, ~__GFP_FS));
+		page = read_cache_page_gfp(inode->i_mapping, index, mapping_gfp_constraint(inode->i_mapping, ~__GFP_FS));
 		if (IS_ERR(page))
 			return page;
 		/* should already be PageUptodate, no need to lock page */
@@ -63,10 +62,16 @@ void *erofs_bread(struct erofs_buf *buf, struct inode *inode,
 	return buf->base + (offset & ~PAGE_MASK);
 }
 
+void erofs_init_metabuf(struct erofs_buf *buf, struct super_block *sb)
+{
+	buf->inode = sb->s_bdev->bd_inode;
+}
+
 void *erofs_read_metabuf(struct erofs_buf *buf, struct super_block *sb,
 			 erofs_blk_t blkaddr, enum erofs_kmap_type type)
 {
-	return erofs_bread(buf, sb->s_bdev->bd_inode, blkaddr, type);
+	erofs_init_metabuf(buf, sb);
+	return erofs_bread(buf, blkaddr, type);
 }
 
 static int erofs_map_blocks_flatmode(struct inode *inode,
