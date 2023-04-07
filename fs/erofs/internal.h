@@ -103,8 +103,8 @@ struct erofs_sb_info {
 	struct inode *managed_cache;
 
 	struct erofs_sb_lz4_info lz4;
-	struct inode *packed_inode;
 #endif	/* CONFIG_EROFS_FS_ZIP */
+	struct inode *packed_inode;
 	struct erofs_dev_context *devs;
 	u64 total_blocks;
 	u32 primarydevice_blocks;
