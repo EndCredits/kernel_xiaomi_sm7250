@@ -718,27 +718,69 @@ int erofs_try_to_free_all_cached_pages(struct erofs_sb_info *sbi,
 	return 0;
 }
 
-int erofs_try_to_free_cached_page(struct page *page)
+static int z_erofs_cache_releasepage(struct page *page, gfp_t gfp_mask)
 {
 	struct z_erofs_pcluster *const pcl = (void *)page_private(page);
-	int ret, i;
+	bool ret;
+	int i;
+
+	if (!PagePrivate(page))
+		return true;
 
 	if (!erofs_workgroup_try_to_freeze(&pcl->obj, 1))
-		return 0;
+		return false;
 
-	ret = 0;
+	ret = false;
 	DBG_BUGON(z_erofs_is_inline_pcluster(pcl));
 	for (i = 0; i < pcl->pclusterpages; ++i) {
 		if (pcl->compressed_bvecs[i].page == page) {
 			WRITE_ONCE(pcl->compressed_bvecs[i].page, NULL);
-			ret = 1;
+			ret = true;
 			break;
 		}
 	}
 	erofs_workgroup_unfreeze(&pcl->obj, 1);
+
 	if (ret)
 		detach_page_private(page);
 	return ret;
+}
+
+/*
+ * It will be called only on inode eviction. In case that there are still some
+ * decompression requests in progress, wait with rescheduling for a bit here.
+ * An extra lock could be introduced instead but it seems unnecessary.
+ */
+static void z_erofs_cache_invalidatepage(struct page *page, unsigned int offset, unsigned int length)
+{
+	const unsigned int stop = length + offset;
+
+	/* Check for potential overflow in debug mode */
+	DBG_BUGON(stop > PAGE_SIZE || stop < length);
+
+	if (offset == 0 && stop == PAGE_SIZE)
+		while (!z_erofs_cache_releasepage(page, GFP_NOFS))
+			cond_resched();
+}
+
+static const struct address_space_operations z_erofs_cache_aops = {
+	.releasepage = z_erofs_cache_releasepage,
+	.invalidatepage = z_erofs_cache_invalidatepage,
+};
+
+int erofs_init_managed_cache(struct super_block *sb)
+{
+	struct inode *const inode = new_inode(sb);
+
+	if (!inode)
+		return -ENOMEM;
+
+	set_nlink(inode, 1);
+	inode->i_size = OFFSET_MAX;
+	inode->i_mapping->a_ops = &z_erofs_cache_aops;
+	mapping_set_gfp_mask(inode->i_mapping, GFP_NOFS);
+	EROFS_SB(sb)->managed_cache = inode;
+	return 0;
 }
 
 static bool z_erofs_try_inplace_io(struct z_erofs_decompress_frontend *fe,
