@@ -4407,56 +4407,9 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 		if (WARN_ON_ONCE(!load))
 			load = 1;
 		lag = div_s64(lag, load);
-
-		vruntime -= lag;
 	}
 
-	if (sched_feat(FAIR_SLEEPERS)) {
-
-		/* sleeps up to a single latency don't count. */
-		if (!initial) {
-			unsigned long thresh = sysctl_sched_latency;
-
-			/*
-			 * Halve their sleep time's effect, to allow
-			 * for a gentler effect of sleepers:
-			 */
-			if (sched_feat(GENTLE_FAIR_SLEEPERS))
-				thresh >>= 1;
-
-			vruntime -= thresh;
-#ifdef CONFIG_SCHED_WALT
-			if (entity_is_task(se)) {
-				if ((per_task_boost(task_of(se)) ==
-						TASK_BOOST_STRICT_MAX) ||
-						walt_low_latency_task(task_of(se)) ||
-						task_rtg_high_prio(task_of(se))) {
-					vruntime -= sysctl_sched_latency;
-					vruntime -= thresh;
-					se->vruntime = vruntime;
-					return;
-				}
-			}
-#endif
-		}
-
-		se->vruntime = vruntime;
-
-		/*
-		 * When joining the competition; the exisiting tasks will be,
-		 * on average, halfway through their slice, as such start tasks
-		 * off with half a slice to ease into the competition.
-		 */
-		if (sched_feat(PLACE_DEADLINE_INITIAL) && initial)
-			vslice /= 2;
-
-		/*
-		 * EEVDF: vd_i = ve_i + r_i/w_i
-		 */
-		se->deadline = se->vruntime + vslice;
-	}
-
-	se->vruntime = vruntime;
+	se->vruntime = vruntime - lag;
 
 	/*
 	 * When joining the competition; the exisiting tasks will be,
