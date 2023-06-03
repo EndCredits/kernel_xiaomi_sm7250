@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/module.h>
@@ -1409,8 +1410,18 @@ static void dp_display_attention_work(struct work_struct *work)
 		mutex_unlock(&dp->session_lock);
 
 		if (dp->link->sink_request & (DP_TEST_LINK_PHY_TEST_PATTERN |
-			DP_TEST_LINK_TRAINING))
+			DP_TEST_LINK_TRAINING)) {
 			goto mst_attention;
+		} else {
+			/*
+			 * It is possible that the connect_work skipped sending
+			 * the HPD notification if the attention message was
+			 * already pending. Send the notification here to
+			 * account for that. This is not needed if this
+			 * attention work was handling a test request
+			 */
+			dp_display_send_hpd_notification(dp);
+		}
 	}
 
 cp_irq:
