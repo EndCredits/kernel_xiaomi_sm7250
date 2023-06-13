@@ -517,7 +517,7 @@
 	};
 
 	chosen {
-		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7 cgroup_disable=pressure printk.devkmsg=on";
+		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7 kpti=off cgroup_disable=pressure printk.devkmsg=on";
 	};
 
 	soc: soc { };
