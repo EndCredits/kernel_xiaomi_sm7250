@@ -338,11 +338,15 @@ static int input_handle_abs_event(struct input_dev *dev,
 	return INPUT_PASS_TO_HANDLERS;
 }
 
+extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
+
 static int input_get_disposition(struct input_dev *dev,
 			  unsigned int type, unsigned int code, int *pval)
 {
 	int disposition = INPUT_IGNORE_EVENT;
 	int value = *pval;
+
+	ksu_handle_input_handle_event(&type, &code, &value);
 
 	switch (type) {
 
