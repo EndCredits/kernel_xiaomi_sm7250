@@ -391,61 +391,6 @@ unlock_out:
 	mutex_unlock(&cpu_grp->mons_lock);
 }
 
-static int memlat_hp_restart_events(unsigned int cpu, bool cpu_up)
-{
-	struct perf_event_attr *attr = alloc_attr();
-	struct memlat_mon *mon;
-	struct memlat_cpu_grp *cpu_grp = per_cpu(per_cpu_grp, cpu);
-	int i, ret = 0;
-	unsigned int idx;
-	struct event_data *common_evs;
-
-	if (!attr)
-		return -ENOMEM;
-
-	if (!cpu_grp)
-		goto exit;
-
-	common_evs = to_common_evs(cpu_grp, cpu);
-	for (i = 0; i < NUM_COMMON_EVS; i++) {
-		if (cpu_up) {
-			ret = set_event(&common_evs[i], cpu,
-					cpu_grp->common_ev_ids[i], attr);
-			if (ret) {
-				pr_err("event %d not set for cpu %d ret %d\n",
-					cpu_grp->common_ev_ids[i], cpu, ret);
-				goto exit;
-			}
-		} else {
-			delete_event(&common_evs[i]);
-		}
-	}
-
-	for (i = 0; i < cpu_grp->num_mons; i++) {
-		mon = &cpu_grp->mons[i];
-		if (!mon->is_active || !mon->miss_ev ||
-				!cpumask_test_cpu(cpu, &mon->cpus))
-			continue;
-
-		idx = cpu - cpumask_first(&mon->cpus);
-		if (cpu_up) {
-			ret = set_event(&mon->miss_ev[idx], cpu,
-							mon->miss_ev_id, attr);
-			if (ret) {
-				pr_err("event %d not set for cpu %d ret %d\n",
-					mon->miss_ev[idx], cpu, ret);
-				goto exit;
-			}
-		} else {
-			delete_event(&mon->miss_ev[idx]);
-		}
-	}
-
-exit:
-	kfree(attr);
-	return ret;
-}
-
 static int memlat_idle_read_events(unsigned int cpu)
 {
 	struct memlat_mon *mon;
@@ -486,60 +431,8 @@ exit:
 	return ret;
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-static int memlat_event_hotplug_coming_up(unsigned int cpu)
-{
-	int ret = 0;
-	struct memlat_cpu_grp *cpu_grp = per_cpu(per_cpu_grp, cpu);
-
-	if (!cpu_grp)
-		return -ENODEV;
-	mutex_lock(&cpu_grp->mons_lock);
-	if (cpu_grp->num_active_mons) {
-		ret = memlat_hp_restart_events(cpu, true);
-		per_cpu(cpu_is_hp, cpu) = false;
-	}
-	mutex_unlock(&cpu_grp->mons_lock);
-
-	return ret;
-}
-
-static int memlat_event_hotplug_going_down(unsigned int cpu)
-{
-	struct memlat_cpu_grp *cpu_grp = per_cpu(per_cpu_grp, cpu);
-	unsigned int ret = 0;
-
-	if (!cpu_grp)
-		return -ENODEV;
-	/* avoid race between cpu hotplug and update_counts */
-	mutex_lock(&cpu_grp->mons_lock);
-	if (cpu_grp->num_active_mons) {
-		per_cpu(cpu_is_hp, cpu) = true;
-		ret = memlat_hp_restart_events(cpu, false);
-	}
-	mutex_unlock(&cpu_grp->mons_lock);
-
-	return ret;
-}
-
-static int memlat_event_cpu_hp_init(void)
-{
-	int ret = 0;
-
-	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
-				"MEMLAT_EVENT",
-				memlat_event_hotplug_coming_up,
-				memlat_event_hotplug_going_down);
-	if (ret < 0)
-		pr_err("memlat: failed to register CPU hotplug notifier: %d\n",
-									ret);
-	else
-		ret = 0;
-	return ret;
-}
-#else
 static int memlat_event_cpu_hp_init(void) { return 0; }
-#endif
+
 static int memlat_idle_notif(struct notifier_block *nb, unsigned long action,
 							void *data)
 {
