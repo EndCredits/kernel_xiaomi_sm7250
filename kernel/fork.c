@@ -2453,11 +2453,6 @@ long _do_fork(unsigned long clone_flags,
 		init_completion(&vfork);
 		get_task_struct(p);
 	}
-	
-#ifdef CONFIG_SF_BINDER
-	p->sf_binder_task = 0;
-#endif
-
 	if (IS_ENABLED(CONFIG_LRU_GEN) && !(clone_flags & CLONE_VM)) {
 		/* lock the task to synchronize with memcg migration */
 		task_lock(p);

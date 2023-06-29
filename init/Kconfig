@@ -1513,11 +1513,6 @@ config ELF_CORE
 	help
 	  Enable support for generating core dumps. Disabling saves about 4k.
 
-config SF_BINDER
-	default n
-	bool "surfaceflinger binder thread" if EXPERT
-	help
-	  Xiaomi restore surfaceflinger binder prio FIFO
 
 config PCSPKR_PLATFORM
 	bool "Enable PC-Speaker support" if EXPERT
