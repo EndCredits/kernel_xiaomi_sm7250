@@ -32,7 +32,3 @@ obj-$(CONFIG_MEMBARRIER) += membarrier.o
 obj-$(CONFIG_CPU_ISOLATION) += isolation.o
 obj-$(CONFIG_SCHED_CORE_CTL) += core_ctl.o
 obj-$(CONFIG_PSI) += psi.o
-obj-$(CONFIG_PACKAGE_RUNTIME_INFO) += pkg_core.o
-obj-$(CONFIG_PACKAGE_RUNTIME_INFO) += pkg_interface.o
-obj-$(CONFIG_PACKAGE_RUNTIME_INFO) += migt_sched.o
-obj-$(CONFIG_PACKAGE_RUNTIME_INFO) += glk.o

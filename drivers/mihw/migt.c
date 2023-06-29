@@ -14,7 +14,6 @@
 
 #define pr_fmt(fmt) "migt: " fmt
 
-#include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
@@ -32,7 +31,6 @@
 #include <linux/hrtimer.h>
 #include <linux/sched/core_ctl.h>
 #include <linux/cred.h>
-#include <linux/pkg_stat.h>
 
 #define CREATE_TRACE_POINTS
 #include "migt_trace.h"
@@ -139,6 +137,7 @@ module_param(tsched_debug, uint, 0644);
 static DECLARE_BITMAP(cluster_affinity_uid_mlist, BIT_MAP_SIZE);
 static DECLARE_BITMAP(cluster_affinity_uid_llist, BIT_MAP_SIZE);
 static DECLARE_BITMAP(cluster_affinity_uid_blist, BIT_MAP_SIZE);
+
 
 int enable_pkg_monitor = 1;
 module_param(enable_pkg_monitor, uint, 0644);

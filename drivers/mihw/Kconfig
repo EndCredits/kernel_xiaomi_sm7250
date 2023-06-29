@@ -1,10 +1,10 @@
-menuconfig MIHW_KCONFIG
+menuconfig MIHW
 	tristate "Xiaomi hardware boost support"
 	default y
 	help
 		This is Xiaomi custom hardware boost support
 
-if MIHW_KCONFIG
+if MIHW
 
 config MIGT
 	bool "boost cpufreq when load high"

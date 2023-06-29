@@ -95,19 +95,6 @@ config LOCALVERSION
 	  object and source tree, in that order.  Your total string can
 	  be a maximum of 64 characters.
 
-config MIHW
-       bool "MI driver"
-       default y
-       help
-         Mi driver code
-
-config PACKAGE_RUNTIME_INFO
-       bool "stat:package runtime info on cluster"
-       default y
-       depends on MIHW
-       help
-         This option can show package runtime info in sup/big/little core.
-
 config LOCALVERSION_AUTO
 	bool "Automatically append version information to the version string"
 	default y

@@ -29,7 +29,6 @@
 #include <linux/mm_event.h>
 #include <linux/task_io_accounting.h>
 #include <linux/rseq.h>
-#include <linux/pkg_stat.h>
 
 /* task_struct member predeclarations (sorted alphabetically): */
 struct audit_context;
@@ -1495,16 +1494,6 @@ struct task_struct {
 #endif
 	/* task is frozen/stopped (used by the cgroup freezer) */
 	ANDROID_KABI_USE(1, unsigned frozen:1);
-
-#ifdef CONFIG_PACKAGE_RUNTIME_INFO
-	struct package_runtime_info pkg;
-#endif
-
-	struct {
-		struct work_struct work;
-		atomic_t running;
-		bool free_stack;
-	} async_free;
 
 	/*
 	 * New fields for task_struct should be added above here, so that
