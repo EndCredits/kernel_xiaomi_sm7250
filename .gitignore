@@ -141,3 +141,10 @@ kernel/configs/android-*.cfg
 
 # Tech package directories
 #techpack/
+
+# build artifcats
+out/
+
+# Build resources
+clang*
+AnyKernel3*/
