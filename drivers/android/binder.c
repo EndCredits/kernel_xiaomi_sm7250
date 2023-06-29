@@ -1168,7 +1168,6 @@ static void binder_do_set_priority(struct task_struct *task,
 		} else if (priority > max_rtprio) {
 			priority = max_rtprio;
 		}
-#endif
 	}
 
 	if (verify && is_fair_policy(policy) && !has_cap_nice) {
@@ -5307,8 +5306,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	}
 
 #ifdef CONFIG_PERF_CRITICAL_RT_TASK
-	if ((strncmp(proc->tsk->comm, "com.android.launcher3", strlen("com.android.launcher3")) == 0) ||
-		(strncmp(proc->tsk->comm, "android.systemui", strlen("android.systemui")) == 0) ||
+	if ((strncmp(proc->tsk->comm, "com.miui.home", strlen("com.miui.home")) == 0) ||
 		(strncmp(proc->tsk->comm, "ndroid.systemui", strlen("ndroid.systemui")) == 0)) {
 		proc->tsk->critical_rt_task = 1;
 	}
