@@ -63,7 +63,6 @@
 #include <linux/mutex.h>
 #include <linux/cgroup.h>
 #include <linux/wait.h>
-#include <linux/pkg_stat.h>
 
 DEFINE_STATIC_KEY_FALSE(cpusets_pre_enable_key);
 DEFINE_STATIC_KEY_FALSE(cpusets_enabled_key);
@@ -2473,17 +2472,6 @@ void cpuset_cpus_allowed(struct task_struct *tsk, struct cpumask *pmask)
 	guarantee_online_cpus(task_cs(tsk), pmask);
 	rcu_read_unlock();
 	spin_unlock_irqrestore(&callback_lock, flags);
-}
-
-/**
-*Allows the child process of the RT or other threads whose affinity has been
-*modified to inherit the affinity of its scheduling group.
-**/
-void cpuset_cpus_allowed_mi(struct task_struct *tsk)
-{
-    rcu_read_lock();
-    sched_setaffinity(tsk->pid,task_cs(tsk)->cpus_allowed);
-    rcu_read_unlock();
 }
 
 /**

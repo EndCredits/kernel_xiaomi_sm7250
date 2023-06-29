@@ -72,7 +72,7 @@
 #include <linux/security.h>
 #include <linux/spinlock.h>
 #include <linux/ratelimit.h>
-#include <linux/millet.h>
+
 #include <uapi/linux/android/binder.h>
 #include <uapi/linux/sched/types.h>
 
@@ -1151,17 +1151,6 @@ static void binder_do_set_priority(struct task_struct *task,
 	if (verify && is_rt_policy(policy) && !has_cap_nice) {
 		long max_rtprio = task_rlimit(task, RLIMIT_RTPRIO);
 
-#ifdef CONFIG_PERF_CRITICAL_RT_TASK
-		unsigned int critical_rt_task = task->group_leader->critical_rt_task;
-		if (!critical_rt_task) {
-			if (max_rtprio == 0) {
-				policy = SCHED_NORMAL;
-				priority = MIN_NICE;
-			} else if (priority > max_rtprio) {
-				priority = max_rtprio;
-			}
-		}
-#else
 		if (max_rtprio == 0) {
 			policy = SCHED_NORMAL;
 			priority = MIN_NICE;
@@ -5245,12 +5234,6 @@ static int binder_open(struct inode *nodp, struct file *filp)
 		proc->default_priority.prio = NICE_TO_PRIO(0);
 	}
 
-#ifdef CONFIG_PERF_CRITICAL_RT_TASK
-	if ((strncmp(proc->tsk->comm, "com.miui.home", strlen("com.miui.home")) == 0) ||
-		(strncmp(proc->tsk->comm, "ndroid.systemui", strlen("ndroid.systemui")) == 0)) {
-		proc->tsk->critical_rt_task = 1;
-	}
-#endif
 #ifdef CONFIG_SF_BINDER
 	if (strncmp(proc->tsk->comm,"surfaceflinger",strlen("surfaceflinger")) == 0) {
 		proc->tsk->sf_binder_task = 1;
