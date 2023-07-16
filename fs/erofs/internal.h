@@ -470,6 +470,26 @@ static inline int z_erofs_load_lzma_config(struct super_block *sb,
 }
 #endif	/* !CONFIG_EROFS_FS_ZIP_LZMA */
 
+#ifdef CONFIG_EROFS_FS_ZIP_DEFLATE
+int __init z_erofs_deflate_init(void);
+void z_erofs_deflate_exit(void);
+int z_erofs_load_deflate_config(struct super_block *sb,
+				struct erofs_super_block *dsb,
+				struct z_erofs_deflate_cfgs *dfl, int size);
+#else
+static inline int z_erofs_deflate_init(void) { return 0; }
+static inline int z_erofs_deflate_exit(void) { return 0; }
+static inline int z_erofs_load_deflate_config(struct super_block *sb,
+			struct erofs_super_block *dsb,
+			struct z_erofs_deflate_cfgs *dfl, int size) {
+	if (dfl) {
+		erofs_err(sb, "deflate algorithm isn't enabled");
+		return -EINVAL;
+	}
+	return 0;
+}
+#endif	/* !CONFIG_EROFS_FS_ZIP_DEFLATE */
+
 #define EFSCORRUPTED    EUCLEAN         /* Filesystem is corrupted */
 
 #ifdef CONFIG_HIGHMEM
