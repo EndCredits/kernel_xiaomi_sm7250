@@ -478,4 +478,15 @@ static inline void *kmap_local_page(struct page *page) { return page_address(pag
 static inline void kunmap_local(const void *vaddr) {}
 #endif
 
+static inline void memcpy_to_page(struct page *page, size_t offset,
+				  const char *from, size_t len)
+{
+	char *to = kmap_local_page(page);
+
+	VM_BUG_ON(offset + len > PAGE_SIZE);
+	memcpy(to + offset, from, len);
+	flush_dcache_page(page);
+	kunmap_local(to);
+}
+
 #endif	/* __EROFS_INTERNAL_H */
