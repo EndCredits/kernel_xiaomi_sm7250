@@ -489,4 +489,10 @@ static inline void memcpy_to_page(struct page *page, size_t offset,
 	kunmap_local(to);
 }
 
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+#define rcu_read_lock_any_held() rcu_read_lock_held() || rcu_read_lock_bh_held() || rcu_read_lock_sched_held()
+#else /* #ifdef CONFIG_DEBUG_LOCK_ALLOC */
+#define rcu_read_lock_any_held() !preemptible()
+#endif /* #else #ifdef CONFIG_DEBUG_LOCK_ALLOC */
+
 #endif	/* __EROFS_INTERNAL_H */
