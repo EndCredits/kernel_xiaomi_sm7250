@@ -27,6 +27,8 @@
 #include <linux/of_device.h>
 #include <linux/mutex.h>
 #include <soc/qcom/scm.h>
+#include <linux/cpu.h>
+#include <linux/spinlock.h>
 
 enum common_ev_idx {
 	INST_IDX,
@@ -48,6 +50,7 @@ struct event_data {
 	struct perf_event *pevent;
 	unsigned long prev_count;
 	unsigned long last_delta;
+	u64   cached_total_count;
 };
 
 struct cpu_data {
@@ -140,6 +143,7 @@ struct memlat_cpu_grp {
 	unsigned int		num_active_mons;
 	struct memlat_mon	*mons;
 	struct mutex		mons_lock;
+	spinlock_t		mon_active_lock;
 };
 
 struct memlat_mon_spec {
@@ -155,20 +159,28 @@ struct memlat_mon_spec {
 #define to_mon(hwmon) container_of(hwmon, struct memlat_mon, hw)
 
 static struct workqueue_struct *memlat_wq;
+static DEFINE_PER_CPU(struct memlat_cpu_grp *, per_cpu_grp);
+static DEFINE_MUTEX(notify_lock);
+static int hp_idle_register_cnt;
+static DEFINE_PER_CPU(bool, cpu_is_idle);
+static DEFINE_PER_CPU(bool, cpu_is_hp);
 
 #define MAX_COUNT_LIM 0xFFFFFFFFFFFFFFFF
 static inline void read_event(struct event_data *event)
 {
-	unsigned long ev_count = 0;
 	u64 total, enabled, running;
 
 	if (!event->pevent)
 		return;
 
-	total = perf_event_read_value(event->pevent, &enabled, &running);
-	ev_count = total - event->prev_count;
+	if (!per_cpu(cpu_is_idle, event->pevent->cpu) &&
+			!per_cpu(cpu_is_hp, event->pevent->cpu))
+		total = perf_event_read_value(event->pevent, &enabled,
+								&running);
+	else
+		total = event->cached_total_count;
+	event->last_delta = total - event->prev_count;
 	event->prev_count = total;
-	event->last_delta = ev_count;
 }
 
 static void update_counts(struct memlat_cpu_grp *cpu_grp)
@@ -239,12 +251,13 @@ static unsigned long get_cnt(struct memlat_hwmon *hw)
 
 		devstats->freq = cpu_data->freq;
 		devstats->stall_pct = cpu_data->stall_pct;
-		devstats->inst_count = common_evs[INST_IDX].last_delta;
 
-		if (mon->miss_ev)
+		if (mon->miss_ev) {
+			devstats->inst_count =
+				common_evs[INST_IDX].last_delta;
 			devstats->mem_count =
 				mon->miss_ev[mon_idx].last_delta;
-		else {
+		} else {
 			devstats->inst_count = 0;
 			devstats->mem_count = 1;
 		}
@@ -262,7 +275,9 @@ static unsigned long get_cnt(struct memlat_hwmon *hw)
 
 static void delete_event(struct event_data *event)
 {
-	event->prev_count = event->last_delta = 0;
+	event->prev_count = 0;
+	event->last_delta = 0;
+	event->cached_total_count = 0;
 	if (event->pevent) {
 		perf_event_release_kernel(event->pevent);
 		event->pevent = NULL;
@@ -313,6 +328,8 @@ static int init_common_evs(struct memlat_cpu_grp *cpu_grp,
 	for_each_cpu(cpu, &cpu_grp->cpus) {
 		struct event_data *common_evs = to_common_evs(cpu_grp, cpu);
 
+		if (per_cpu(cpu_is_hp, cpu))
+			continue;
 		for (i = 0; i < NUM_COMMON_EVS; i++) {
 			ret = set_event(&common_evs[i], cpu,
 					cpu_grp->common_ev_ids[i], attr);
@@ -374,6 +391,71 @@ unlock_out:
 	mutex_unlock(&cpu_grp->mons_lock);
 }
 
+static int memlat_idle_read_events(unsigned int cpu)
+{
+	struct memlat_mon *mon;
+	struct memlat_cpu_grp *cpu_grp = per_cpu(per_cpu_grp, cpu);
+	int i, ret = 0;
+	unsigned int idx;
+	struct event_data *common_evs;
+	unsigned long flags;
+
+	if (!cpu_grp)
+		return 0;
+
+	spin_lock_irqsave(&cpu_grp->mon_active_lock, flags);
+	if (!cpu_grp->num_active_mons)
+		goto exit;
+
+	common_evs = to_common_evs(cpu_grp, cpu);
+	for (i = 0; i < NUM_COMMON_EVS; i++) {
+		if (common_evs[i].pevent)
+			ret = perf_event_read_local(common_evs[i].pevent,
+				&common_evs[i].cached_total_count, NULL, NULL);
+	}
+
+	for (i = 0; i < cpu_grp->num_mons; i++) {
+		mon = &cpu_grp->mons[i];
+		if (!mon->is_active || !mon->miss_ev ||
+				!cpumask_test_cpu(cpu, &mon->cpus)) {
+			continue;
+		}
+
+		idx = cpu - cpumask_first(&mon->cpus);
+		if (mon->miss_ev[idx].pevent)
+			ret = perf_event_read_local(mon->miss_ev[idx].pevent,
+			&mon->miss_ev[idx].cached_total_count, NULL, NULL);
+	}
+exit:
+	spin_unlock_irqrestore(&cpu_grp->mon_active_lock, flags);
+	return ret;
+}
+
+static int memlat_idle_notif(struct notifier_block *nb, unsigned long action,
+							void *data)
+{
+	int ret = NOTIFY_OK;
+	int cpu = smp_processor_id();
+
+	switch (action) {
+	case IDLE_START:
+		__this_cpu_write(cpu_is_idle, true);
+		if (per_cpu(cpu_is_hp, cpu))
+			goto idle_exit;
+		else
+			ret = memlat_idle_read_events(cpu);
+		break;
+	case IDLE_END:
+		__this_cpu_write(cpu_is_idle, false);
+		break;
+	}
+idle_exit:
+	return ret;
+}
+static struct notifier_block memlat_event_idle_nb = {
+	.notifier_call = memlat_idle_notif,
+};
+
 static int start_hwmon(struct memlat_hwmon *hw)
 {
 	int ret = 0;
@@ -382,13 +464,26 @@ static int start_hwmon(struct memlat_hwmon *hw)
 	struct memlat_cpu_grp *cpu_grp = mon->cpu_grp;
 	bool should_init_cpu_grp;
 	struct perf_event_attr *attr = alloc_attr();
+	unsigned long flags;
 
 	if (!attr)
 		return -ENOMEM;
 
 	mutex_lock(&cpu_grp->mons_lock);
-	should_init_cpu_grp = !(cpu_grp->num_active_mons++);
+	should_init_cpu_grp = !(cpu_grp->num_active_mons);
 	if (should_init_cpu_grp) {
+		mutex_lock(&notify_lock);
+		if (!hp_idle_register_cnt) {
+			get_online_cpus();
+			for_each_cpu(cpu, cpu_possible_mask) {
+				if (!cpumask_test_cpu(cpu, cpu_online_mask))
+					per_cpu(cpu_is_hp, cpu) = true;
+			}
+			put_online_cpus();
+			idle_notifier_register(&memlat_event_idle_nb);
+		}
+		hp_idle_register_cnt++;
+		mutex_unlock(&notify_lock);
 		ret = init_common_evs(cpu_grp, attr);
 		if (ret)
 			goto unlock_out;
@@ -400,6 +495,8 @@ static int start_hwmon(struct memlat_hwmon *hw)
 		for_each_cpu(cpu, &mon->cpus) {
 			unsigned int idx = cpu - cpumask_first(&mon->cpus);
 
+			if (per_cpu(cpu_is_hp, cpu))
+				continue;
 			ret = set_event(&mon->miss_ev[idx], cpu,
 					mon->miss_ev_id, attr);
 			if (ret)
@@ -419,7 +516,11 @@ static int start_hwmon(struct memlat_hwmon *hw)
 		}
 	}
 
+	spin_lock_irqsave(&cpu_grp->mon_active_lock, flags);
+	cpu_grp->num_active_mons++;
 	mon->is_active = true;
+	spin_unlock_irqrestore(&cpu_grp->mon_active_lock, flags);
+
 
 	if (should_init_cpu_grp)
 		queue_delayed_work(memlat_wq, &cpu_grp->work,
@@ -437,10 +538,13 @@ static void stop_hwmon(struct memlat_hwmon *hw)
 	unsigned int cpu;
 	struct memlat_mon *mon = to_mon(hw);
 	struct memlat_cpu_grp *cpu_grp = mon->cpu_grp;
+	unsigned long flags;
 
 	mutex_lock(&cpu_grp->mons_lock);
+	spin_lock_irqsave(&cpu_grp->mon_active_lock, flags);
 	mon->is_active = false;
 	cpu_grp->num_active_mons--;
+	spin_unlock_irqrestore(&cpu_grp->mon_active_lock, flags);
 
 	for_each_cpu(cpu, &mon->cpus) {
 		unsigned int idx = cpu - cpumask_first(&mon->cpus);
@@ -458,8 +562,21 @@ static void stop_hwmon(struct memlat_hwmon *hw)
 	if (!cpu_grp->num_active_mons) {
 		cancel_delayed_work(&cpu_grp->work);
 		free_common_evs(cpu_grp);
+		mutex_lock(&notify_lock);
+		hp_idle_register_cnt--;
+		mutex_unlock(&notify_lock);
 	}
 	mutex_unlock(&cpu_grp->mons_lock);
+	mutex_lock(&notify_lock);
+	if (!hp_idle_register_cnt) {
+		cpuhp_remove_state_nocalls(CPUHP_AP_ONLINE_DYN);
+		idle_notifier_unregister(&memlat_event_idle_nb);
+		for_each_cpu(cpu, cpu_possible_mask) {
+			per_cpu(cpu_is_hp, cpu) = false;
+			per_cpu(cpu_is_idle, cpu) = false;
+		}
+	}
+	mutex_unlock(&notify_lock);
 }
 
 /**
@@ -561,7 +678,7 @@ static int memlat_cpu_grp_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct memlat_cpu_grp *cpu_grp;
 	int ret = 0;
-	unsigned int event_id, num_cpus, num_mons;
+	unsigned int event_id, num_cpus, num_mons, cpu;
 
 	cpu_grp = devm_kzalloc(dev, sizeof(*cpu_grp), GFP_KERNEL);
 	if (!cpu_grp)
@@ -618,8 +735,12 @@ static int memlat_cpu_grp_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	mutex_init(&cpu_grp->mons_lock);
+	spin_lock_init(&cpu_grp->mon_active_lock);
 	cpu_grp->update_ms = DEFAULT_UPDATE_MS;
 
+	for_each_cpu(cpu, &cpu_grp->cpus) {
+		per_cpu(per_cpu_grp, cpu) = cpu_grp;
+	}
 	dev_set_drvdata(dev, cpu_grp);
 
 	return 0;
@@ -633,9 +754,11 @@ static int memlat_mon_probe(struct platform_device *pdev, bool is_compute)
 	struct memlat_mon *mon;
 	struct memlat_hwmon *hw;
 	unsigned int event_id, num_cpus, cpu;
+	unsigned long flags;
 
 	if (!memlat_wq)
-		memlat_wq = create_freezable_workqueue("memlat_wq");
+		memlat_wq = alloc_workqueue("memlat_wq", WQ_HIGHPRI | WQ_FREEZABLE |
+				            WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
 
 	if (!memlat_wq) {
 		dev_err(dev, "Couldn't create memlat workqueue.\n");
@@ -648,9 +771,11 @@ static int memlat_mon_probe(struct platform_device *pdev, bool is_compute)
 		return -ENODEV;
 	}
 
-	mutex_lock(&cpu_grp->mons_lock);
+	mutex_lock_nested(&cpu_grp->mons_lock, SINGLE_DEPTH_NESTING);
 	mon = &cpu_grp->mons[cpu_grp->num_inited_mons];
+	spin_lock_irqsave(&cpu_grp->mon_active_lock, flags);
 	mon->is_active = false;
+	spin_unlock_irqrestore(&cpu_grp->mon_active_lock, flags);
 	mon->requested_update_ms = 0;
 	mon->cpu_grp = cpu_grp;
 
@@ -660,7 +785,8 @@ static int memlat_mon_probe(struct platform_device *pdev, bool is_compute)
 		if (!cpumask_subset(&mon->cpus, &cpu_grp->cpus)) {
 			dev_err(dev,
 				"Mon CPUs must be a subset of cpu_grp CPUs. mon=%*pbl cpu_grp=%*pbl\n",
-				mon->cpus, cpu_grp->cpus);
+				cpumask_pr_args(&mon->cpus),
+				cpumask_pr_args(&cpu_grp->cpus));
 			ret = -EINVAL;
 			goto unlock_out;
 		}

@@ -42,7 +42,7 @@
 #define NVT_DUMP_PARTITION_LEN  (1024)
 #define NVT_DUMP_PARTITION_PATH "/data/local/tmp"
 
-struct timeval start, end;
+static struct timeval start, end;
 const struct firmware *fw_entry = NULL;
 static size_t fw_need_write_size = 0;
 static uint8_t *fwbuf = NULL;
@@ -100,7 +100,7 @@ static int32_t nvt_download_init(void)
 	//NVT_LOG("NVT_TRANSFER_LEN = 0x%06X\n", NVT_TRANSFER_LEN);
 
 	if (fwbuf == NULL) {
-		fwbuf = (uint8_t *)kzalloc((NVT_TRANSFER_LEN+1), GFP_KERNEL);
+		fwbuf = (uint8_t *)kzalloc((NVT_TRANSFER_LEN + 1 + DUMMY_BYTES), GFP_KERNEL);
 		if(fwbuf == NULL) {
 			NVT_ERR("kzalloc for fwbuf failed!\n");
 			return -ENOMEM;
@@ -960,7 +960,7 @@ fail:
 			NVT_ERR("error, retry=%d\n", retry);
 			nvt_read_bld_hw_crc();
 #if NVT_TOUCH_ESD_DISP_RECOVERY
-			if (nvt_check_crc_done_ilm_err()) {
+			if (nvt_check_crc_done_ilm_err() || nvt_check_crc_done_ilm_err() || nvt_check_crc_done_ilm_err()) {
 				NVT_ERR("set display off to trigger display esd recovery.\n");
 				nvt_f2c_disp_off();
 			}

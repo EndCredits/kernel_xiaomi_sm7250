@@ -220,7 +220,7 @@ static int __scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
 
 #else
 
-static int __scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
+static int ___scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
 				u64 *ret1, u64 *ret2, u64 *ret3)
 {
 	register u32 r0 asm("r0") = w0;

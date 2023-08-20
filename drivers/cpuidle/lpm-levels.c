@@ -134,7 +134,7 @@ module_param_named(sleep_disabled_touch, sleep_disabled_touch, bool, 0664);
  */
 s32 msm_cpuidle_get_deep_idle_latency(void)
 {
-	return 10;
+	return 2;
 }
 EXPORT_SYMBOL(msm_cpuidle_get_deep_idle_latency);
 
