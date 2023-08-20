@@ -70,10 +70,13 @@ generate_flashable(){
 
     cd $OUT;
     
-    echo ' Getting AnyKernel ';
-    curl $ANYKERNEL_URL -o $ANYKERNEL_FILE;
-
-    unzip -o $ANYKERNEL_FILE;
+    if [ ! -d $ANYKERNEL_PATH ]; then
+        echo ' Getting AnyKernel ';
+        curl $ANYKERNEL_URL -o $ANYKERNEL_FILE;
+        unzip -o $ANYKERNEL_FILE;
+    else
+        echo ' Anykernel 3 Detected. Skipping download '
+    fi
 
     echo ' Removing old package file ';
     rm -rf $ANYKERNEL_PATH/$TARGET_KERNEL_NAME*;
