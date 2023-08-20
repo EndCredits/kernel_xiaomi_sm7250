@@ -12,8 +12,6 @@
 #  Add clang to your PATH before using this script.
 #
 
-LOCAL_VERSION_NUMBER=v2.2.0
-
 ARCH=arm64;
 CC=clang;
 CLANG_TRIPLE=aarch64-linux-gnu-;
@@ -27,10 +25,12 @@ TARGET_KERNEL_FILE=arch/arm64/boot/Image;
 TARGET_KERNEL_DTB=arch/arm64/boot/dtb;
 TARGET_KERNEL_DTBO=arch/arm64/boot/dtbo.img
 TARGET_KERNEL_NAME=Driftwood-Kernel;
-TARGET_KERNEL_MOD_VERSION=$(make kernelversion)-$LOCAL_VERSION_NUMBER;
 
 DEFCONFIG_PATH=arch/arm64/configs
 DEFCONFIG_NAME=vendor/picasso_user_defconfig;
+
+LOCAL_VERSION_NUMBER=$(cat $DEFCONFIG_PATH/$DEFCONFIG_NAME | grep CONFIG_LOCALVERSION= | cut -d = -f 2 | sed 's/"//g' | sed 's/-Driftwood-//g')
+TARGET_KERNEL_MOD_VERSION=$(make kernelversion)-$LOCAL_VERSION_NUMBER;
 
 START_SEC=$(date +%s);
 CURRENT_TIME=$(date '+%Y-%m%d%H%M');
