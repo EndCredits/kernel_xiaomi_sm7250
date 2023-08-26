@@ -103,7 +103,7 @@ module_param(monitor_region_end, ulong, 0600);
  * If this parameter is set as ``Y``, DAMON_RECLAIM does not reclaim anonymous
  * pages.  By default, ``N``.
  */
-static bool skip_anon __read_mostly;
+static bool skip_anon __read_mostly = true;
 module_param(skip_anon, bool, 0600);
 
 /*
