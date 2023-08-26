@@ -218,7 +218,9 @@ static bool __damos_pa_filter_out(struct damos_filter *filter,
 		break;
 	case DAMOS_FILTER_TYPE_MEMCG:
 		rcu_read_lock();
-		memcg = page_memcg_check(page);
+		memcg = READ_ONCE(page->mem_cgroup);
+		if ((unsigned long) memcg & 0x1UL)
+			memcg = NULL;
 		if (!memcg)
 			matched = false;
 		else
