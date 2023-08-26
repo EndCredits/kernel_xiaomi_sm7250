@@ -101,12 +101,11 @@ static struct attribute *damon_sysfs_scheme_region_attrs[] = {
 	&damon_sysfs_scheme_region_age_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_scheme_region);
 
 static struct kobj_type damon_sysfs_scheme_region_ktype = {
 	.release = damon_sysfs_scheme_region_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_scheme_region_groups,
+	.default_attrs = damon_sysfs_scheme_region_attrs,
 };
 
 /*
@@ -151,12 +150,11 @@ static void damon_sysfs_scheme_regions_release(struct kobject *kobj)
 static struct attribute *damon_sysfs_scheme_regions_attrs[] = {
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_scheme_regions);
 
 static struct kobj_type damon_sysfs_scheme_regions_ktype = {
 	.release = damon_sysfs_scheme_regions_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_scheme_regions_groups,
+	.default_attrs = damon_sysfs_scheme_regions_attrs,
 };
 
 /*
@@ -381,12 +379,11 @@ static struct attribute *damon_sysfs_scheme_filter_attrs[] = {
 	&damon_sysfs_scheme_filter_memcg_path_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_scheme_filter);
 
 static struct kobj_type damon_sysfs_scheme_filter_ktype = {
 	.release = damon_sysfs_scheme_filter_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_scheme_filter_groups,
+	.default_attrs = damon_sysfs_scheme_filter_attrs,
 };
 
 /*
@@ -500,12 +497,11 @@ static struct attribute *damon_sysfs_scheme_filters_attrs[] = {
 	&damon_sysfs_scheme_filters_nr_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_scheme_filters);
 
 static struct kobj_type damon_sysfs_scheme_filters_ktype = {
 	.release = damon_sysfs_scheme_filters_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_scheme_filters_groups,
+	.default_attrs = damon_sysfs_scheme_filters_attrs,
 };
 
 /*
