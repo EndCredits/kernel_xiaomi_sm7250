@@ -211,12 +211,11 @@ static struct attribute *damon_sysfs_stats_attrs[] = {
 	&damon_sysfs_stats_qt_exceeds_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_stats);
 
 static struct kobj_type damon_sysfs_stats_ktype = {
 	.release = damon_sysfs_stats_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_stats_groups,
+	.default_attrs = damon_sysfs_stats_attrs,
 };
 
 /*
@@ -394,12 +393,11 @@ static struct attribute *damon_sysfs_watermarks_attrs[] = {
 	&damon_sysfs_watermarks_low_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_watermarks);
 
 static struct kobj_type damon_sysfs_watermarks_ktype = {
 	.release = damon_sysfs_watermarks_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_watermarks_groups,
+	.default_attrs = damon_sysfs_watermarks_attrs,
 };
 
 /*
@@ -511,12 +509,11 @@ static struct attribute *damon_sysfs_weights_attrs[] = {
 	&damon_sysfs_weights_age_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_weights);
 
 static struct kobj_type damon_sysfs_weights_ktype = {
 	.release = damon_sysfs_weights_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_weights_groups,
+	.default_attrs = damon_sysfs_weights_attrs,
 };
 
 /*
@@ -642,12 +639,11 @@ static struct attribute *damon_sysfs_quotas_attrs[] = {
 	&damon_sysfs_quotas_reset_interval_ms_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_quotas);
 
 static struct kobj_type damon_sysfs_quotas_ktype = {
 	.release = damon_sysfs_quotas_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_quotas_groups,
+	.default_attrs = damon_sysfs_quotas_attrs,
 };
 
 /*
@@ -741,12 +737,11 @@ static void damon_sysfs_access_pattern_release(struct kobject *kobj)
 static struct attribute *damon_sysfs_access_pattern_attrs[] = {
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_access_pattern);
 
 static struct kobj_type damon_sysfs_access_pattern_ktype = {
 	.release = damon_sysfs_access_pattern_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_access_pattern_groups,
+	.default_attrs = damon_sysfs_access_pattern_attrs,
 };
 
 /*
@@ -944,12 +939,11 @@ static struct attribute *damon_sysfs_scheme_attrs[] = {
 	&damon_sysfs_scheme_action_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_scheme);
 
 static struct kobj_type damon_sysfs_scheme_ktype = {
 	.release = damon_sysfs_scheme_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_scheme_groups,
+	.default_attrs = damon_sysfs_scheme_attrs,
 };
 
 /*
@@ -1066,12 +1060,11 @@ static struct attribute *damon_sysfs_schemes_attrs[] = {
 	&damon_sysfs_schemes_nr_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_schemes);
 
 static struct kobj_type damon_sysfs_schemes_ktype = {
 	.release = damon_sysfs_schemes_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_schemes_groups,
+	.default_attrs = damon_sysfs_schemes_attrs,
 };
 
 /*
@@ -1157,12 +1150,11 @@ static struct attribute *damon_sysfs_region_attrs[] = {
 	&damon_sysfs_region_end_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_region);
 
 static struct kobj_type damon_sysfs_region_ktype = {
 	.release = damon_sysfs_region_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_region_groups,
+	.default_attrs = damon_sysfs_region_attrs,
 };
 
 /*
@@ -1273,12 +1265,11 @@ static struct attribute *damon_sysfs_regions_attrs[] = {
 	&damon_sysfs_regions_nr_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_regions);
 
 static struct kobj_type damon_sysfs_regions_ktype = {
 	.release = damon_sysfs_regions_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_regions_groups,
+	.default_attrs = damon_sysfs_regions_attrs,
 };
 
 /*
