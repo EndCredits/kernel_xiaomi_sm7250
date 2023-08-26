@@ -7,9 +7,17 @@
 
 #include <linux/damon.h>
 #include <linux/kobject.h>
+#include <linux/sysfs.h>
 #include <linux/pid.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+
+#define __ATTR_RW_MODE(_name, _mode) {					\
+	.attr	= { .name = __stringify(_name),				\
+		    .mode = VERIFY_OCTAL_PERMISSIONS(_mode) },		\
+	.show	= _name##_show,						\
+	.store	= _name##_store,					\
+}
 
 static DEFINE_MUTEX(damon_sysfs_lock);
 
@@ -105,12 +113,11 @@ static struct attribute *damon_sysfs_ul_range_attrs[] = {
 	&damon_sysfs_ul_range_max_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_ul_range);
 
 static struct kobj_type damon_sysfs_ul_range_ktype = {
 	.release = damon_sysfs_ul_range_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_ul_range_groups,
+	.default_attrs = damon_sysfs_ul_range_attrs,
 };
 
 /*
@@ -160,12 +167,11 @@ static struct attribute *damon_sysfs_target_attrs[] = {
 	&damon_sysfs_target_pid_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_target);
 
 static struct kobj_type damon_sysfs_target_ktype = {
 	.release = damon_sysfs_target_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_target_groups,
+	.default_attrs = damon_sysfs_target_attrs,
 };
 
 /*
@@ -278,12 +284,11 @@ static struct attribute *damon_sysfs_targets_attrs[] = {
 	&damon_sysfs_targets_nr_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_targets);
 
 static struct kobj_type damon_sysfs_targets_ktype = {
 	.release = damon_sysfs_targets_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_targets_groups,
+	.default_attrs = damon_sysfs_targets_attrs,
 };
 
 /*
@@ -406,12 +411,11 @@ static struct attribute *damon_sysfs_intervals_attrs[] = {
 	&damon_sysfs_intervals_update_us_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_intervals);
 
 static struct kobj_type damon_sysfs_intervals_ktype = {
 	.release = damon_sysfs_intervals_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_intervals_groups,
+	.default_attrs = damon_sysfs_intervals_attrs,
 };
 
 /*
@@ -488,12 +492,11 @@ static void damon_sysfs_attrs_release(struct kobject *kobj)
 static struct attribute *damon_sysfs_attrs_attrs[] = {
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_attrs);
 
 static struct kobj_type damon_sysfs_attrs_ktype = {
 	.release = damon_sysfs_attrs_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_attrs_groups,
+	.default_attrs = damon_sysfs_attrs_attrs,
 };
 
 /*
@@ -632,12 +635,11 @@ static struct attribute *damon_sysfs_context_attrs[] = {
 	&damon_sysfs_context_operations_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_context);
 
 static struct kobj_type damon_sysfs_context_ktype = {
 	.release = damon_sysfs_context_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_context_groups,
+	.default_attrs = damon_sysfs_context_attrs,
 };
 
 /*
@@ -758,12 +760,11 @@ static struct attribute *damon_sysfs_contexts_attrs[] = {
 	&damon_sysfs_contexts_nr_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_contexts);
 
 static struct kobj_type damon_sysfs_contexts_ktype = {
 	.release = damon_sysfs_contexts_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_contexts_groups,
+	.default_attrs = damon_sysfs_contexts_attrs,
 };
 
 /*
@@ -847,12 +848,11 @@ static struct attribute *damon_sysfs_kdamond_attrs[] = {
 	&damon_sysfs_kdamond_pid_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_kdamond);
 
 static struct kobj_type damon_sysfs_kdamond_ktype = {
 	.release = damon_sysfs_kdamond_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_kdamond_groups,
+	.default_attrs = damon_sysfs_kdamond_attrs,
 };
 
 /*
@@ -994,12 +994,11 @@ static struct attribute *damon_sysfs_kdamonds_attrs[] = {
 	&damon_sysfs_kdamonds_nr_attr.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_kdamonds);
 
 static struct kobj_type damon_sysfs_kdamonds_ktype = {
 	.release = damon_sysfs_kdamonds_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_kdamonds_groups,
+	.default_attrs = damon_sysfs_kdamonds_attrs,
 };
 
 /*
@@ -1044,12 +1043,11 @@ static void damon_sysfs_ui_dir_release(struct kobject *kobj)
 static struct attribute *damon_sysfs_ui_dir_attrs[] = {
 	NULL,
 };
-ATTRIBUTE_GROUPS(damon_sysfs_ui_dir);
 
 static struct kobj_type damon_sysfs_ui_dir_ktype = {
 	.release = damon_sysfs_ui_dir_release,
 	.sysfs_ops = &kobj_sysfs_ops,
-	.default_groups = damon_sysfs_ui_dir_groups,
+	.default_attrs = damon_sysfs_ui_dir_attrs,
 };
 
 static int __init damon_sysfs_init(void)
