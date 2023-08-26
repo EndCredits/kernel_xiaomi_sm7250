@@ -27,7 +27,7 @@
  * watermarks-based activation condition.  Refer to below descriptions for the
  * watermarks parameter for this.
  */
-static bool enabled __read_mostly;
+static bool enabled __read_mostly = true;
 
 /*
  * Make DAMON_LRU_SORT reads the input parameters again, except ``enabled``.
@@ -474,8 +474,7 @@ static const struct kernel_param_ops enabled_param_ops = {
 };
 
 module_param_cb(enabled, &enabled_param_ops, &enabled, 0600);
-MODULE_PARM_DESC(enabled,
-	"Enable or disable DAMON_LRU_SORT (default: disabled)");
+MODULE_PARM_DESC(enabled, "Enable or disable DAMON_LRU_SORT (default: enabled)");
 
 static int damon_lru_sort_handle_commit_inputs(void)
 {
