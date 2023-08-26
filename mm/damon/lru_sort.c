@@ -8,7 +8,6 @@
 #define pr_fmt(fmt) "damon-lru-sort: " fmt
 
 #include <linux/damon.h>
-#include <linux/kstrtox.h>
 #include <linux/module.h>
 
 #include "modules-common.h"
