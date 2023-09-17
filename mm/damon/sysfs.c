@@ -1352,7 +1352,7 @@ static int damon_sysfs_cmd_request_callback(struct damon_ctx *c)
 		break;
 	case DAMON_SYSFS_CMD_UPDATE_SCHEMES_TRIED_BYTES:
 		total_bytes_only = true;
-		fallthrough;
+		/* fallthrough */
 	case DAMON_SYSFS_CMD_UPDATE_SCHEMES_TRIED_REGIONS:
 		if (!damon_sysfs_schemes_regions_updating) {
 			err = damon_sysfs_upd_schemes_regions_start(kdamond,
