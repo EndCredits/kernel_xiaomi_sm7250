@@ -978,7 +978,7 @@ static void smap_gather_stats(struct vm_area_struct *vma,
 	}
 #endif
 	/* mmap_sem is held in m_start */
-	walk_page_vma(vma, &smaps_walk_ops, &mss);
+	walk_page_vma(vma, &smaps_walk_ops, mss);
 }
 
 #define SEQ_PUT_DEC(str, val) \
