@@ -61,7 +61,7 @@
  *    tlb_remove_page() and tlb_remove_page_size() imply the call to
  *    tlb_flush_mmu() when required and has no return value.
  *
- *  - tlb_change_page_size()
+ *  - tlb_remove_check_page_size_change()
  *
  *    call before __tlb_remove_page*() to set the current page-size; implies a
  *    possible tlb_flush_mmu() call.
@@ -113,11 +113,6 @@
  *    returns the smallest TLB entry size unmapped in this range
  *
  * Additionally there are a few opt-in features:
- *
- *  HAVE_MMU_GATHER_PAGE_SIZE
- *
- *  This ensures we call tlb_flush() every time tlb_change_page_size() actually
- *  changes the size and provides mmu_gather::page_size to tlb_flush().
  *
  *  HAVE_RCU_TABLE_FREE
  *
@@ -244,15 +239,11 @@ struct mmu_gather {
 	unsigned int		cleared_puds : 1;
 	unsigned int		cleared_p4ds : 1;
 
-	unsigned int		batch_count;
-
 	struct mmu_gather_batch *active;
 	struct mmu_gather_batch	local;
 	struct page		*__pages[MMU_GATHER_BUNDLE];
-
-#ifdef CONFIG_HAVE_MMU_GATHER_PAGE_SIZE
-	unsigned int page_size;
-#endif
+	unsigned int		batch_count;
+	int page_size;
 };
 
 void arch_tlb_gather_mmu(struct mmu_gather *tlb,
@@ -318,18 +309,21 @@ static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 	return tlb_remove_page_size(tlb, page, PAGE_SIZE);
 }
 
-static inline void tlb_change_page_size(struct mmu_gather *tlb,
+#ifndef tlb_remove_check_page_size_change
+#define tlb_remove_check_page_size_change tlb_remove_check_page_size_change
+static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
 						     unsigned int page_size)
 {
-#ifdef CONFIG_HAVE_MMU_GATHER_PAGE_SIZE
-	if (tlb->page_size && tlb->page_size != page_size) {
-		if (!tlb->fullmm)
-			tlb_flush_mmu(tlb);
-	}
-
+	/*
+	 * We don't care about page size change, just update
+	 * mmu_gather page size here so that debug checks
+	 * doesn't throw false warning.
+	 */
+#ifdef CONFIG_DEBUG_VM
 	tlb->page_size = page_size;
 #endif
 }
+#endif
 
 static inline unsigned long tlb_get_unmap_shift(struct mmu_gather *tlb)
 {
