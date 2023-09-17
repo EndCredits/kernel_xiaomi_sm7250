@@ -42,6 +42,7 @@
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
 #include <linux/idr.h>
+#include <linux/file.h>
 
 struct pid init_struct_pid = {
 	.count		= REFCOUNT_INIT(1),
