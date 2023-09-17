@@ -2362,11 +2362,6 @@ next:
 	return 0;
 }
 
-static const struct mm_walk_ops migrate_vma_walk_ops = {
-	.pmd_entry		= migrate_vma_collect_pmd,
-	.pte_hole		= migrate_vma_collect_hole,
-};
-
 /*
  * migrate_vma_collect() - collect pages over a range of virtual addresses
  * @migrate: migrate struct containing all migration information
@@ -2377,12 +2372,19 @@ static const struct mm_walk_ops migrate_vma_walk_ops = {
  */
 static void migrate_vma_collect(struct migrate_vma *migrate)
 {
-	mmu_notifier_invalidate_range_start(migrate->vma->vm_mm,
+	struct mm_walk mm_walk = {
+		.pmd_entry = migrate_vma_collect_pmd,
+		.pte_hole = migrate_vma_collect_hole,
+		.vma = migrate->vma,
+		.mm = migrate->vma->vm_mm,
+		.private = migrate,
+	};
+
+	mmu_notifier_invalidate_range_start(mm_walk.mm,
 					    migrate->start,
 					    migrate->end);
-	walk_page_range(migrate->vma->vm_mm, migrate->start, migrate->end,
-		&migrate_vma_walk_ops, migrate);
-	mmu_notifier_invalidate_range_end(migrate->vma->vm_mm,
+	walk_page_range(migrate->start, migrate->end, &mm_walk);
+	mmu_notifier_invalidate_range_end(mm_walk.mm,
 					  migrate->start,
 					  migrate->end);
 
