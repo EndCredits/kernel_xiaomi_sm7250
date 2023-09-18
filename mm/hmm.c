@@ -647,6 +647,14 @@ static void hmm_pfns_special(struct hmm_range *range)
 		range->pfns[i] = range->values[HMM_PFN_SPECIAL];
 }
 
+static const struct mm_walk_ops hmm_walk_ops = {
+	.pud_entry	= NULL,
+	.pmd_entry	= hmm_vma_walk_pmd,
+	.pte_hole	= hmm_vma_walk_hole,
+	.hugetlb_entry	= NULL,
+	.test_walk	= NULL,
+};
+
 /*
  * hmm_vma_get_pfns() - snapshot CPU page table for a range of virtual addresses
  * @range: range being snapshotted
@@ -668,7 +676,6 @@ int hmm_vma_get_pfns(struct hmm_range *range)
 {
 	struct vm_area_struct *vma = range->vma;
 	struct hmm_vma_walk hmm_vma_walk;
-	struct mm_walk mm_walk;
 	struct hmm *hmm;
 
 	/* Sanity check, this really should not happen ! */
@@ -710,17 +717,8 @@ int hmm_vma_get_pfns(struct hmm_range *range)
 
 	hmm_vma_walk.fault = false;
 	hmm_vma_walk.range = range;
-	mm_walk.private = &hmm_vma_walk;
 
-	mm_walk.vma = vma;
-	mm_walk.mm = vma->vm_mm;
-	mm_walk.pte_entry = NULL;
-	mm_walk.test_walk = NULL;
-	mm_walk.hugetlb_entry = NULL;
-	mm_walk.pmd_entry = hmm_vma_walk_pmd;
-	mm_walk.pte_hole = hmm_vma_walk_hole;
-
-	walk_page_range(range->start, range->end, &mm_walk);
+	walk_page_range(vma->vm_mm, start, end, &mm_walk, &hmm_vma_walk);
 	return 0;
 }
 EXPORT_SYMBOL(hmm_vma_get_pfns);
@@ -787,33 +785,11 @@ bool hmm_vma_range_done(struct hmm_range *range)
 }
 EXPORT_SYMBOL(hmm_vma_range_done);
 
-static const struct mm_walk_ops hmm_walk_ops = {
-	.pud_entry	= hmm_vma_walk_pud,
-	.pmd_entry	= hmm_vma_walk_pmd,
-	.pte_hole	= hmm_vma_walk_hole,
-	.hugetlb_entry	= hmm_vma_walk_hugetlb_entry,
-};
-
-/**
- * hmm_range_fault - try to fault some address in a virtual address range
- * @range:	range being faulted
- * @flags:	HMM_FAULT_* flags
- *
- * Return: the number of valid pages in range->pfns[] (from range start
- * address), which may be zero.  On error one of the following status codes
- * can be returned:
- *
- * -EINVAL:	Invalid arguments or mm or virtual address is in an invalid vma
- *		(e.g., device file vma).
- * -ENOMEM:	Out of memory.
- * -EPERM:	Invalid permission (e.g., asking for write and range is read
- *		only).
- * -EAGAIN:	A page fault needs to be retried and mmap_sem was dropped.
- * -EBUSY:	The range has been invalidated and the caller needs to wait for
- *		the invalidation to finish.
- * -EFAULT:	Invalid (i.e., either no valid vma or it is illegal to access
- *		that range) number of valid pages in range->pfns[] (from
- *              range start address).
+/*
+ * hmm_vma_fault() - try to fault some address in a virtual address range
+ * @range: range being faulted
+ * @block: allow blocking on fault (if true it sleeps and do not drop mmap_sem)
+ * Returns: 0 success, error otherwise (-EAGAIN means mmap_sem have been drop)
  *
  * This is similar to a regular CPU page fault except that it will not trigger
  * any memory migration if the memory being faulted is not accessible by CPUs.
@@ -859,8 +835,9 @@ static const struct mm_walk_ops hmm_walk_ops = {
 int hmm_vma_fault(struct hmm_range *range, bool block)
 {
 	struct vm_area_struct *vma = range->vma;
-	unsigned long start = range->start, end;
+	unsigned long start = range->start;
 	struct hmm_vma_walk hmm_vma_walk;
+	struct mm_walk mm_walk;
 	struct hmm *hmm;
 	int ret;
 
@@ -907,12 +884,9 @@ int hmm_vma_fault(struct hmm_range *range, bool block)
 	hmm_vma_walk.block = block;
 	hmm_vma_walk.range = range;
 	hmm_vma_walk.last = range->start;
-	end = min(range->end, vma->vm_end);
 
-	walk_page_range(vma->vm_mm, start, end, &hmm_walk_ops,
-		&hmm_vma_walk);
 	do {
-		ret = walk_page_range(start, range->end, &mm_walk);
+		ret = walk_page_range(vma->vm_mm, start, end, &mm_walk, &hmm_vma_walk);
 		start = hmm_vma_walk.last;
 	} while (ret == -EAGAIN);
 

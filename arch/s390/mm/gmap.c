@@ -2559,6 +2559,10 @@ static int __s390_enable_skey_pte(pte_t *pte, unsigned long addr,
 	return 0;
 }
 
+static const struct mm_walk_ops enable_skey_walk_ops = {
+	.hugetlb_entry		= __s390_enable_skey_hugetlb,
+	.pte_entry		= __s390_enable_skey_pte,
+};
 static int __s390_enable_skey_hugetlb(pte_t *pte, unsigned long addr,
 				      unsigned long hmask, unsigned long next,
 				      struct mm_walk *walk)
@@ -2583,11 +2587,6 @@ static int __s390_enable_skey_hugetlb(pte_t *pte, unsigned long addr,
 	set_bit(PG_arch_1, &page->flags);
 	return 0;
 }
-
-static const struct mm_walk_ops enable_skey_walk_ops = {
-	.hugetlb_entry		= __s390_enable_skey_hugetlb,
-	.pte_entry		= __s390_enable_skey_pte,
-};
 
 int s390_enable_skey(void)
 {

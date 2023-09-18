@@ -941,20 +941,17 @@ static int smaps_hugetlb_range(pte_t *pte, unsigned long hmask,
 #define smaps_hugetlb_range	NULL
 #endif /* HUGETLB_PAGE */
 
-static const struct mm_walk_ops smaps_walk_ops = {
-	.pmd_entry		= smaps_pte_range,
-	.hugetlb_entry		= smaps_hugetlb_range,
-};
-
-static const struct mm_walk_ops smaps_shmem_walk_ops = {
-	.pmd_entry		= smaps_pte_range,
-	.hugetlb_entry		= smaps_hugetlb_range,
-	.pte_hole		= smaps_pte_hole,
+struct mm_walk_ops smaps_walk_ops = {
+	.pmd_entry = smaps_pte_range,
+#ifdef CONFIG_HUGETLB_PAGE
+	.hugetlb_entry = smaps_hugetlb_range,
+#endif
 };
 
 static void smap_gather_stats(struct vm_area_struct *vma,
 			     struct mem_size_stats *mss)
 {
+
 #ifdef CONFIG_SHMEM
 	/* In case of smaps_rollup, reset the value from previous vma */
 	mss->check_shmem_swap = false;
@@ -976,8 +973,7 @@ static void smap_gather_stats(struct vm_area_struct *vma,
 			mss->swap += shmem_swapped;
 		} else {
 			mss->check_shmem_swap = true;
-			walk_page_vma(vma, &smaps_shmem_walk_ops, mss);
-			return;
+			smaps_walk_ops.pte_hole = smaps_pte_hole;
 		}
 	}
 #endif
@@ -1694,7 +1690,9 @@ static int pagemap_hugetlb_range(pte_t *ptep, unsigned long hmask,
 static const struct mm_walk_ops pagemap_ops = {
 	.pmd_entry	= pagemap_pmd_range,
 	.pte_hole	= pagemap_pte_hole,
+#ifdef CONFIG_HUGETLB_PAGE
 	.hugetlb_entry	= pagemap_hugetlb_range,
+#endif
 };
 
 /*
@@ -1754,6 +1752,7 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 	ret = -ENOMEM;
 	if (!pm.buffer)
 		goto out_mm;
+
 
 	src = *ppos;
 	svpfn = src / PM_ENTRY_BYTES;
