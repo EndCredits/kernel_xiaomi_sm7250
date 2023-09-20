@@ -2151,6 +2151,8 @@ static void default_options(struct f2fs_sb_info *sbi, bool remount)
 		F2FS_OPTION(sbi).compress_ext_cnt = 0;
 		F2FS_OPTION(sbi).compress_mode = COMPR_MODE_FS;
 	}
+	set_opt(sbi, GC_MERGE);
+	set_opt(sbi, ATGC);
 	F2FS_OPTION(sbi).bggc_mode = BGGC_MODE_ON;
 	F2FS_OPTION(sbi).memory_mode = MEMORY_MODE_NORMAL;
 	F2FS_OPTION(sbi).errors = MOUNT_ERRORS_CONTINUE;
