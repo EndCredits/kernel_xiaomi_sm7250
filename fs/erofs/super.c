@@ -527,14 +527,13 @@ static int erofs_fill_super(struct super_block *sb, void *data, int silent)
 	xa_init(&sbi->managed_pslots);
 #endif
 
-	/* get the root inode */
-	inode = erofs_iget(sb, ROOT_NID(sbi));
+	inode = erofs_iget(sb, sbi->root_nid);
 	if (IS_ERR(inode))
 		return PTR_ERR(inode);
 
 	if (!S_ISDIR(inode->i_mode)) {
 		erofs_err(sb, "rootino(nid %llu) is not a directory(i_mode %o)",
-			  ROOT_NID(sbi), inode->i_mode);
+			  sbi->root_nid, inode->i_mode);
 		iput(inode);
 		return -EINVAL;
 	}
@@ -566,7 +565,7 @@ static int erofs_fill_super(struct super_block *sb, void *data, int silent)
 		return err;
 
 	erofs_info(sb, "mounted with opts: %s, root inode @ nid %llu.",
-		   (char *)data, ROOT_NID(sbi));
+		   (char *)data, sbi->root_nid);
 	return 0;
 }
 
