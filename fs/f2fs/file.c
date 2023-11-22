@@ -22,6 +22,7 @@
 #include <linux/file.h>
 #include <linux/nls.h>
 #include <linux/sched/signal.h>
+#include <linux/fadvise.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -4670,6 +4671,26 @@ out:
 	return ret;
 }
 
+static int f2fs_file_fadvise(struct file *filp, loff_t offset, loff_t len,
+		int advice)
+{
+	struct inode *inode = file_inode(filp);
+	int err;
+
+	if (advice == POSIX_FADV_WILLNEED && offset == 0) {
+		/* Load extent cache at the first readahead. */
+		f2fs_precache_extents(inode);
+	}
+
+	err = generic_fadvise(filp, offset, len, advice);
+	if (!err && advice == POSIX_FADV_DONTNEED &&
+		test_opt(F2FS_I_SB(inode), COMPRESS_CACHE) &&
+		f2fs_compressed_file(inode))
+		f2fs_invalidate_compress_pages(F2FS_I_SB(inode), inode->i_ino);
+
+	return err;
+}
+
 #ifdef CONFIG_COMPAT
 struct compat_f2fs_gc_range {
 	u32 sync;
@@ -4806,4 +4827,5 @@ const struct file_operations f2fs_file_operations = {
 #endif
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= iter_file_splice_write,
+	.fadvise	= f2fs_file_fadvise,
 };
