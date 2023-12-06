@@ -625,6 +625,8 @@ static void z_erofs_bind_cache(struct z_erofs_decompress_frontend *fe)
 			__GFP_NOMEMALLOC | __GFP_NORETRY | __GFP_NOWARN;
 	unsigned int i;
 
+	if (i_blocksize(fe->inode) != PAGE_SIZE)
+		return;
 	if (fe->mode < Z_EROFS_PCLUSTER_FOLLOWED)
 		return;
 
@@ -1017,13 +1019,13 @@ static int z_erofs_do_read_page(struct z_erofs_decompress_frontend *fe,
 	struct inode *const inode = fe->inode;
 	struct erofs_map_blocks *const map = &fe->map;
 	const loff_t offset = page_offset(page);
+	const unsigned int bs = i_blocksize(inode);
 	bool tight = true, exclusive;
 	unsigned int cur, end, spiltted;
 	int err = 0;
 
 	/* register locked file pages as online pages in pack */
 	z_erofs_onlinepage_init(page);
-
 	spiltted = 0;
 	end = PAGE_SIZE;
 repeat:
@@ -1105,7 +1107,7 @@ hitted:
 		goto next_part;
 	}
 
-	exclusive = (!cur && (!spiltted || tight));
+	exclusive = (!cur && (!spiltted || (tight && bs == PAGE_SIZE)));
 	if (cur)
 		tight &= (fe->mode >= Z_EROFS_PCLUSTER_FOLLOWED);
 
