@@ -257,11 +257,9 @@ static int erofs_fill_inode(struct inode *inode)
 
 	if (erofs_inode_is_data_compressed(vi->datalayout)) {
 #ifdef CONFIG_EROFS_FS_ZIP
-		if (inode->i_sb->s_blocksize_bits == PAGE_SHIFT) {
-			inode->i_mapping->a_ops = &z_erofs_aops;
-			err = 0;
-			goto out_unlock;
-		}
+		inode->i_mapping->a_ops = &z_erofs_aops;
+		err = 0;
+		goto out_unlock;
 #endif
 		err = -EOPNOTSUPP;
 		goto out_unlock;
