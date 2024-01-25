@@ -14,11 +14,12 @@
 
 ARCH=arm64;
 CC=clang;
+LD=ld.lld
 CLANG_TRIPLE=aarch64-linux-gnu-;
 CROSS_COMPILE=aarch64-linux-gnu-;
 CROSS_COMPILE_COMPAT=arm-linux-gnueabi-;
 THREAD=$(nproc --all);
-CC_ADDITION_FLAGS="";
+CC_ADDITION_FLAGS="LD=$LD";
 OUT="../out";
 
 TARGET_KERNEL_FILE=arch/arm64/boot/Image;
