@@ -25,8 +25,7 @@ void z_erofs_deflate_exit(void)
 		strm = z_erofs_deflate_head;
 		if (!strm) {
 			spin_unlock(&z_erofs_deflate_lock);
-			DBG_BUGON(1);
-			return;
+			continue;
 		}
 		z_erofs_deflate_head = NULL;
 		spin_unlock(&z_erofs_deflate_lock);
@@ -58,8 +57,10 @@ int __init z_erofs_deflate_init(void)
 
 		/* XXX: in-kernel zlib cannot shrink windowbits currently */
 		strm->z.workspace = vmalloc(zlib_inflate_workspacesize());
-		if (!strm->z.workspace)
+		if (!strm->z.workspace) {
+			kfree(strm);
 			goto out_failed;
+		}
 
 		spin_lock(&z_erofs_deflate_lock);
 		strm->next = z_erofs_deflate_head;
@@ -96,7 +97,6 @@ int z_erofs_load_deflate_config(struct super_block *sb,
 int z_erofs_deflate_decompress(struct z_erofs_decompress_req *rq,
 			       struct page **pagepool)
 {
-	static u8 skipped[PAGE_SIZE];
 	const unsigned int nrpages_out =
 		PAGE_ALIGN(rq->pageofs_out + rq->outputsize) >> PAGE_SHIFT;
 	const unsigned int nrpages_in =
@@ -157,22 +157,20 @@ again:
 				kunmap_local(kout);
 			strm->z.avail_out = min_t(u32, outsz, PAGE_SIZE - pofs);
 			outsz -= strm->z.avail_out;
-			if (rq->out[no] && rq->fillgaps) /* deduped data */
+			if (!rq->out[no]) {
 				rq->out[no] = erofs_allocpage(pagepool,
 						GFP_KERNEL | __GFP_NOFAIL);
-			if (rq->out[no]) {
-				kout = kmap_local_page(rq->out[no]) + pofs;
-				strm->z.next_out = kout;
-			} else {
-				kout = NULL;
-				strm->z.next_out = skipped;
+				set_page_private(rq->out[no],
+						 Z_EROFS_SHORTLIVED_PAGE);
 			}
+			kout = kmap_local_page(rq->out[no]);
+			strm->z.next_out = kout + pofs;
 			pofs = 0;
 		}
 
 		if (!strm->z.avail_in && insz) {
 			if (++ni >= nrpages_in) {
-				erofs_err(sb, "compressed data was invalid");
+				erofs_err(sb, "invalid compressed data");
 				err = -EFSCORRUPTED;
 				break;
 			}
@@ -221,7 +219,7 @@ again:
 		}
 
 		zerr = zlib_inflate(&strm->z, Z_SYNC_FLUSH);
-		if (zerr != Z_OK || !outsz) {
+		if (zerr != Z_OK || !(outsz + strm->z.avail_out)) {
 			if (zerr == Z_OK && rq->partial_decoding)
 				break;
 			if (zerr == Z_STREAM_END && !outsz)
@@ -238,8 +236,7 @@ again:
 	if (kout)
 		kunmap_local(kout);
 failed_zinit:
-	if (kin)
-		kunmap_local(kin);
+	kunmap_local(kin);
 	/* 4. push back DEFLATE stream context to the global list */
 	spin_lock(&z_erofs_deflate_lock);
 	strm->next = z_erofs_deflate_head;
